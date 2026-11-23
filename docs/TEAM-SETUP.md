@@ -145,19 +145,39 @@ npm ls next react react-dom
 
 ## 컨테이너와 공유 Supabase
 
-**`backend/Dockerfile`**은 `/srv/backend`에 Python 패키지를 배치합니다. 의존성을 먼저 설치하면 라우트 파일만 수정할 때 설치 레이어를 재사용할 수 있습니다.
+**`backend/Dockerfile`**은 저장소 루트를 빌드 컨텍스트로 사용합니다. Python 3.15.2에서 잠금 파일의 `jiter`, `scikit-network`, `zstandard`는 소스 빌드가 필요합니다. 빌드 단계에서 `build-essential`로 C/C++ 도구를 설치하고, Rust 1.88 이상을 요구하는 `jiter`를 위해 공식 Rust 1.91 이미지의 도구를 사용합니다. 실행 단계에는 같은 Python 베이스, 가상환경, OpenMP 실행 라이브러리만 가져옵니다.
 
 ~~~dockerfile
-FROM python:3.15.2-slim
+FROM rust:1.91-slim-trixie AS rust-tools
+FROM python:3.15.2-slim-trixie AS python-base
+
+FROM python-base AS builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=rust-tools /usr/local/rustup /usr/local/rustup
+COPY --from=rust-tools /usr/local/cargo/bin /usr/local/cargo/bin
 COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /usr/local/bin/uv
+ENV RUSTUP_HOME=/usr/local/rustup \
+    PATH="/usr/local/cargo/bin:$PATH" \
+    UV_PYTHON_DOWNLOADS=never
 WORKDIR /srv
 COPY .python-version pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
+
+FROM python-base AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /srv
+COPY --from=builder /srv/.venv /srv/.venv
 ENV PATH="/srv/.venv/bin:$PATH"
 COPY backend/ /srv/backend
 EXPOSE 8000
 CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ~~~
+
+위 예시를 `backend/Dockerfile`로 저장한 뒤, 저장소 루트에서 `docker build --target builder -f backend/Dockerfile .`을 실행하면 API 코드나 DB 자격 증명 없이 운영 의존성 설치까지 확인할 수 있습니다.
 
 **`frontend/Dockerfile`**은 Next.js 개발 서버를 실행합니다. `frontend/.dockerignore`에 `node_modules`, `.next`, `.env*`, `coverage`를 넣습니다. 백엔드용 루트 `.dockerignore`에서도 `.venv`, `__pycache__`, `.env*`와 커버리지 결과물을 빌드 컨텍스트에서 제외합니다.
 
