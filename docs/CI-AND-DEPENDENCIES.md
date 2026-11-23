@@ -9,13 +9,13 @@
 | Python 백엔드 | pytest + pytest-cov | `backend/coverage.xml` | `backend` |
 | Next.js 프론트엔드 | Vitest + V8 coverage | `frontend/coverage/lcov.info` | `frontend` |
 
-**Python.** `backend/requirements-dev.txt`의 테스트 의존성을 설치합니다. 저장소 루트의 [Python 커버리지 설정](../.coveragerc)을 사용합니다. `source = .`로 소스 경로에 `backend/` 접두사를 보존하고, 보고서는 백엔드 제품 코드로 제한합니다.
+**Python.** 루트의 `uv.lock`에서 개발 의존성까지 설치합니다. 저장소 루트의 [Python 커버리지 설정](../.coveragerc)을 사용합니다. `source = .`로 소스 경로에 `backend/` 접두사를 보존하고, 보고서는 백엔드 제품 코드로 제한합니다.
 
 저장소 루트에서 실행합니다. 첫 테스트는 고정 검색기가 빈 결과를 반환할 때 질의 처리기가 `insufficient_evidence`를 반환하는 경우로 시작할 수 있습니다.
 
 ~~~sh
-python -m pip install -r backend/requirements-dev.txt
-python -m pytest backend/tests --cov --cov-config=.coveragerc --cov-report=xml:backend/coverage.xml
+uv sync --locked
+uv run --locked python -m pytest backend/tests --cov --cov-config=.coveragerc --cov-report=xml:backend/coverage.xml
 ~~~
 
 **Next.js.** `frontend/`에서 아래 명령을 실행합니다. 테스트 러너와 V8 도구는 같은 릴리스로 설치하고 `package.json`과 `package-lock.json`을 함께 기록합니다. 첫 테스트로 `src/lib/chat.ts`의 추가 질문 재전송 로직을 검증하면 브라우저나 실서버가 필요 없습니다.
@@ -33,7 +33,7 @@ npm pkg set 'scripts.test:coverage=vitest run --coverage'
 
 저장소 관리자가 Codecov에서 해당 GitHub 저장소를 활성화하고 저장소 전용 업로드 토큰을 GitHub의 **Settings → Secrets and variables → Actions**에 `CODECOV_TOKEN`으로 등록합니다. 아래 워크플로는 일반 팀 PR과 `main`에서 두 보고서를 올리고, 포크 PR·Dependabot PR에서는 인증 정보 없이 두 테스트만 실행합니다. 팀 PR이나 `main`에서 업로드가 실패하면 해당 작업도 실패합니다. [Codecov 공식 액션과 지원 입력](https://github.com/codecov/codecov-action/tree/v7.1.1)
 
-[커버리지 워크플로](../.github/workflows/coverage.yml)는 체크아웃 후 언어별 매니페스트를 확인합니다. Python의 `backend/requirements-dev.txt` 또는 Next.js의 `frontend/package.json`이 없으면 해당 작업 요약에 대기 상태를 기록합니다. 매니페스트가 생긴 후에는 테스트가 없거나 필요한 잠금 파일·스크립트가 빠지면 CI에서 실패를 확인할 수 있습니다.
+[커버리지 워크플로](../.github/workflows/coverage.yml)는 Python 환경을 항상 `uv sync --locked`로 재현합니다. 백엔드 Python 파일이 생기면 테스트와 업로드도 실행합니다. Next.js는 `frontend/package.json`이 생기면 테스트를 시작합니다.
 
 [Codecov 설정](../codecov.yml)은 저장소 루트에 있습니다. LCOV 경로를 Git 경로로 맞추고 각 플래그가 담당하는 디렉터리를 지정합니다. 팀이 아직 합의하지 않은 최소 커버리지 수치는 지정하지 않았습니다.
 
@@ -41,8 +41,8 @@ npm pkg set 'scripts.test:coverage=vitest run --coverage'
 
 ## 3. GitHub Dependabot
 
-[Dependabot 설정](../.github/dependabot.yml)에 주간 버전 확인을 설정했습니다. Python 의존성 위치는 `/backend`, npm 잠금 파일 위치는 `/frontend`입니다. 두 Dockerfile의 기반 이미지와 저장소 루트에서 관리하는 GitHub Actions도 갱신 대상입니다. 현재 Compose는 로컬 Dockerfile을 빌드하므로 외부 이미지는 두 Dockerfile에서 추적합니다. [GitHub 지원 생태계](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories) · [Dependabot 설정 옵션](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference)
+[Dependabot 설정](../.github/dependabot.yml)에 주간 버전 확인을 설정했습니다. Python의 `uv` 생태계와 잠금 파일 위치는 저장소 루트(`/`), npm 잠금 파일 위치는 `/frontend`입니다. 두 Dockerfile의 기반 이미지와 저장소 루트에서 관리하는 GitHub Actions도 갱신 대상입니다. 현재 Compose는 로컬 Dockerfile을 빌드하므로 외부 이미지는 두 Dockerfile에서 추적합니다. [GitHub 지원 생태계](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories) · [Dependabot 설정 옵션](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference)
 
 **활성화와 첫 확인.** 기본 브랜치에 매니페스트·잠금 파일과 위 설정을 반영하면 버전 갱신 작업을 예약할 수 있습니다. 보안 취약점 수정 PR도 받을 때는 저장소 설정에서 Dependency graph, Dependabot alerts, Dependabot security updates를 활성화합니다. GitHub의 Dependabot 작업 기록에서 각 경로가 인식됐는지 확인합니다. 최신 상태라 PR이 생기지 않은 경우에도 작업 기록에서 확인할 수 있습니다.
 
-기반 이미지 버전 변경 PR은 CI의 `python-version` 또는 `node-version`과 함께 검토합니다. Dependabot은 Docker 이미지 태그를 올려도 CI 입력에 적은 런타임 문자열까지 동기화하지는 않습니다. Python 패키지 변경 때는 실행용·개발용 의존성의 공통 버전을 확인하고 npm 변경 때는 잠금 파일까지 함께 검토합니다.
+기반 이미지 버전 변경 PR은 루트의 `.python-version` 또는 CI의 `node-version`과 함께 검토합니다. Dependabot은 Docker 이미지 태그를 올려도 CI 입력에 적은 런타임 문자열까지 동기화하지는 않습니다. Python 패키지 변경 때는 `pyproject.toml`과 `uv.lock`을 확인하고 npm 변경 때는 잠금 파일까지 함께 검토합니다.

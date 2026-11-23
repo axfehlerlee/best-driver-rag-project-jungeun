@@ -29,8 +29,6 @@ backend/
   retrieval/                     인프라 · SQL, 임베딩, 재정렬
   answers/                       인프라 · GPT와 근거 연결
   tests/                         도메인·유스케이스·HTTP·어댑터 테스트
-  requirements.txt
-  requirements-dev.txt
   Dockerfile
 frontend/
   src/app/page.tsx                자치구 선택·FAQ·결과 화면
@@ -43,10 +41,13 @@ frontend/
 supabase/migrations/              DB·검색 담당자의 스키마 변경 이력
 evaluation/                      구별 기본 동작과 품질 평가
 compose.yaml
+pyproject.toml                     백엔드 실행·개발 의존성
+.python-version                    Python 인터프리터 버전
+uv.lock                            전이 의존성까지 포함한 잠금 파일
 .env.example
 ~~~
 
-Python 패키지 디렉터리에는 `__init__.py`를 둡니다. 저장소 루트에서 실행하고 `from backend.domain.models import Question`처럼 패키지 경로로 가져옵니다. 컨테이너 빌드 컨텍스트는 서비스별 폴더입니다.
+Python 패키지 디렉터리에는 `__init__.py`를 둡니다. 저장소 루트에서 실행하고 `from backend.domain.models import Question`처럼 패키지 경로로 가져옵니다. 백엔드는 루트의 uv 설정을 읽기 위해 저장소 루트를 빌드 컨텍스트로 사용하고, 프론트엔드는 자체 폴더를 사용합니다.
 
 | 백엔드 계층 | 참조할 수 있는 대상 | 첫 구현과 책임 |
 | --- | --- | --- |
@@ -73,7 +74,7 @@ class AnswerGenerator(Protocol):
 
 ## 버전 기준과 초기 환경 준비
 
-2026년 11월 23일 공식 배포 기준은 **Python 3.15.2**, **Next.js 16.4.6**, **Node.js 26.13.1 LTS**입니다. 로컬·컨테이너·CI에 같은 버전을 쓰고, npm 잠금 파일과 Python 의존성 목록을 버전 관리합니다. [Python 공식 릴리스](https://www.python.org/downloads/source/) · [Next.js npm 배포 정보](https://registry.npmjs.org/next/latest) · [Node.js 공식 다운로드](https://nodejs.org/en/download)
+2026년 11월 23일 공식 배포 기준은 **Python 3.15.2**, **Next.js 16.4.6**, **Node.js 26.13.1 LTS**입니다. 로컬·컨테이너·CI에 같은 버전을 쓰고, npm 잠금 파일과 Python의 uv 잠금 파일을 버전 관리합니다. [Python 공식 릴리스](https://www.python.org/downloads/source/) · [Next.js npm 배포 정보](https://registry.npmjs.org/next/latest) · [Node.js 공식 다운로드](https://nodejs.org/en/download)
 
 저장소 루트에서 아래 명령으로 UI를 생성합니다. `frontend/`에 팀의 Vitest 설정이 이미 있으므로, 빈 임시 폴더에서 Next.js 기본 파일을 생성한 뒤 기존 파일을 보존하며 복사합니다. 생성된 `src/app/`의 루트 레이아웃을 사용하고 설치 결과와 잠금 파일을 확인합니다.
 
@@ -86,19 +87,9 @@ npm install --save-exact next@16.4.6
 npm ls next react react-dom
 ~~~
 
-백엔드는 `backend/`를 만든 뒤 저장소 루트에서 새 가상 환경으로 시작합니다. API 담당자가 최초 버전을 기록하고, 나머지 팀원은 고정한 의존성을 설치합니다. DB·모델 클라이언트는 각 어댑터를 연결할 때 추가합니다.
+백엔드 환경은 저장소 루트에서 `uv sync`로 준비합니다. 인터프리터·의존성 파일의 역할, uv 설치 조건과 실행 확인 명령은 [README의 Python 시작 절차](../README.md#python-개발-환경)에 있습니다. 팀원이 패키지를 추가할 때는 `uv add 패키지명`을, 테스트 도구에는 `uv add --dev 패키지명`을 사용하고 `pyproject.toml`과 `uv.lock`을 함께 커밋합니다.
 
-~~~sh
-python3.15 --version
-python3.15 -m venv .venv
-. .venv/bin/activate
-python -m pip install fastapi uvicorn
-python -m pip freeze > backend/requirements.txt
-python -m pip install pytest pytest-cov
-python -m pip freeze > backend/requirements-dev.txt
-~~~
-
-개발 의존성에는 실행 의존성도 들어갑니다. 실행 패키지를 갱신할 때 개발용 목록도 맞춥니다. `backend/main.py`에 FastAPI의 `app`을 만들고 `POST /chat`을 노출합니다. 처음에는 빈 목록을 반환하는 검색기를 주입합니다. 그러면 외부 인증 없이 유효한 요청이 전체 HTTP 경로를 거쳐 `insufficient_evidence`로 끝나는지 확인할 수 있습니다. UI는 그 전부터 아래 고정 응답으로 개발할 수 있습니다.
+`backend/main.py`에 FastAPI의 `app`을 만들고 `POST /chat`을 노출합니다. 처음에는 빈 목록을 반환하는 검색기를 주입합니다. 그러면 외부 인증 없이 유효한 요청이 전체 HTTP 경로를 거쳐 `insufficient_evidence`로 끝나는지 확인할 수 있습니다. UI는 그 전부터 아래 고정 응답으로 개발할 수 있습니다.
 
 ## 수집 데이터와 POST /chat 계약
 
@@ -158,15 +149,17 @@ python -m pip freeze > backend/requirements-dev.txt
 
 ~~~dockerfile
 FROM python:3.15.2-slim
+COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /usr/local/bin/uv
 WORKDIR /srv
-COPY requirements.txt /tmp/requirements.txt
-RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
-COPY . /srv/backend
+COPY .python-version pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev
+ENV PATH="/srv/.venv/bin:$PATH"
+COPY backend/ /srv/backend
 EXPOSE 8000
 CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ~~~
 
-**`frontend/Dockerfile`**은 Next.js 개발 서버를 실행합니다. `frontend/.dockerignore`에 `node_modules`, `.next`, `.env*`, `coverage`를 넣습니다. 백엔드에서도 `.venv`, `__pycache__`, `.env*`와 커버리지 결과물을 빌드 컨텍스트에서 제외합니다.
+**`frontend/Dockerfile`**은 Next.js 개발 서버를 실행합니다. `frontend/.dockerignore`에 `node_modules`, `.next`, `.env*`, `coverage`를 넣습니다. 백엔드용 루트 `.dockerignore`에서도 `.venv`, `__pycache__`, `.env*`와 커버리지 결과물을 빌드 컨텍스트에서 제외합니다.
 
 ~~~dockerfile
 FROM node:26.13.1-bookworm-slim
@@ -198,7 +191,9 @@ export default config;
 ~~~yaml
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file: ./.env
     ports: ["127.0.0.1:8000:8000"]
     volumes: ["./backend:/srv/backend"]

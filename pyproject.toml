@@ -1,0 +1,32 @@
+[project]
+name = "seoul-recycling-rag"
+version = "0.1.0"
+requires-python = "==3.15.2"
+dependencies = [
+    "datasets>=5.2.0",
+    "fastapi",
+    "langchain>=1.5.2",
+    "langchain-community>=0.4.2",
+    "langchain-core>=1.8.4",
+    "langchain-openai>=1.8.5",
+    "langchain-postgres>=0.0.19",
+    "langchain-text-splitters>=1.1.3",
+    "psycopg[binary,pool]>=3.3.9",
+    "pydantic>=2.14.4",
+    "pypdf>=7.1.1",
+    "python-dotenv>=1.2.4",
+    "ragas>=0.4.4",
+    "rank-bm25>=0.2.2",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov"]
+
+[tool.uv]
+package = false
+required-version = ">=0.13.9"
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
