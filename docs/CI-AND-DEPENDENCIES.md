@@ -1,4 +1,4 @@
-# Python·Next.js 커버리지와 의존성 관리
+# Python·Next.js 커버리지, 의존성, 비밀정보 검사
 
 [팀 개발 환경](TEAM-SETUP.md)의 폴더 구조를 전제로 합니다. 통합 담당자가 설정 파일을 관리하고, 각 모듈 담당자가 자신의 테스트와 의존성 변경을 검토합니다. 설정 파일은 저장소에 포함되어 있습니다. 아래에서 파일을 열어 확인하고, 앱을 만들 때 각 언어의 테스트 의존성과 실행 명령을 연결합니다.
 
@@ -31,7 +31,7 @@ npm pkg set 'scripts.test:coverage=vitest run --coverage'
 
 ## 2. Codecov 연결과 GitHub Actions
 
-저장소 관리자가 Codecov에서 해당 GitHub 저장소를 활성화하고 저장소 전용 업로드 토큰을 GitHub의 **Settings → Secrets and variables → Actions**에 `CODECOV_TOKEN`으로 등록합니다. 아래 워크플로는 일반 팀 PR과 `main`에서 두 보고서를 올리고, 포크 PR·Dependabot PR에서는 인증 정보 없이 두 테스트만 실행합니다. 팀 PR이나 `main`에서 업로드가 실패하면 해당 작업도 실패합니다. [Codecov 공식 액션과 지원 입력](https://github.com/codecov/codecov-action/tree/v7.1.1)
+저장소 관리자가 Codecov에서 해당 GitHub 저장소를 활성화하고 저장소 전용 업로드 토큰을 GitHub의 **Settings → Secrets and variables → Actions**에 `CODECOV_TOKEN`으로 등록합니다. 테스트 실행 조건을 충족하면 일반 팀 PR과 `main`에서 해당 보고서를 업로드합니다. 포크 PR과 Dependabot PR에서는 같은 테스트를 실행하고 업로드 단계를 건너뜁니다. 팀 PR이나 `main`에서 업로드가 실패하면 해당 작업도 실패합니다. [Codecov 공식 액션과 지원 입력](https://github.com/codecov/codecov-action/tree/v7.1.1)
 
 [커버리지 워크플로](../.github/workflows/coverage.yml)는 Python 환경을 항상 `uv sync --locked`로 재현합니다. 백엔드 Python 파일이 생기면 테스트와 업로드도 실행합니다. Next.js는 `frontend/package.json`이 생기면 테스트를 시작합니다.
 
@@ -39,10 +39,22 @@ npm pkg set 'scripts.test:coverage=vitest run --coverage'
 
 **연결 확인 기준.** 테스트가 있는 첫 `main` 실행으로 비교 기준을 만듭니다. 이후 팀 PR에서 두 작업이 성공하고 Codecov의 같은 커밋에 `backend`·`frontend` 플래그가 모두 표시되는지 확인합니다. 각 플래그에서 변경 파일 하나를 열어 줄별 커버리지까지 확인합니다. [액션 릴리스](https://github.com/codecov/codecov-action/releases/tag/v7.1.1) · [경로 보정](https://docs.codecov.com/docs/fixing-paths)
 
-## 3. GitHub Dependabot
+## 3. Dependabot으로 의존성 갱신하기
 
 [Dependabot 설정](../.github/dependabot.yml)에 주간 버전 확인을 설정했습니다. Python의 `uv` 생태계와 잠금 파일 위치는 저장소 루트(`/`), npm 잠금 파일 위치는 `/frontend`입니다. 두 Dockerfile의 기반 이미지와 저장소 루트에서 관리하는 GitHub Actions도 갱신 대상입니다. 현재 Compose는 로컬 Dockerfile을 빌드하므로 외부 이미지는 두 Dockerfile에서 추적합니다. [GitHub 지원 생태계](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories) · [Dependabot 설정 옵션](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference)
 
 **활성화와 첫 확인.** 기본 브랜치에 매니페스트·잠금 파일과 위 설정을 반영하면 버전 갱신 작업을 예약할 수 있습니다. 보안 취약점 수정 PR도 받을 때는 저장소 설정에서 Dependency graph, Dependabot alerts, Dependabot security updates를 활성화합니다. GitHub의 Dependabot 작업 기록에서 각 경로가 인식됐는지 확인합니다. 최신 상태라 PR이 생기지 않은 경우에도 작업 기록에서 확인할 수 있습니다.
 
 기반 이미지 버전 변경 PR은 루트의 `.python-version` 또는 CI의 `node-version`과 함께 검토합니다. Dependabot은 Docker 이미지 태그를 올려도 CI 입력에 적은 런타임 문자열까지 동기화하지는 않습니다. Python 패키지 변경 때는 `pyproject.toml`과 `uv.lock`을 확인하고 npm 변경 때는 잠금 파일까지 함께 검토합니다.
+
+## 4. Gitleaks로 커밋에 포함된 비밀정보 확인하기
+
+[검사 워크플로](../.github/workflows/gitleaks.yml)는 PR, `main` 푸시 또는 수동 실행 시 현재 커밋에서 도달할 수 있는 Git 이력을 검사합니다. [프로젝트 설정](../.gitleaks.toml)은 Gitleaks 기본 탐지 규칙을 불러옵니다. CI는 공식 Linux 배포 파일의 SHA-256을 확인한 뒤 실행하며 별도 서비스 토큰이 필요하지 않습니다. 도구 버전을 변경할 때는 워크플로의 버전과 체크섬을 함께 갱신합니다. [Gitleaks 공식 배포](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
+
+로컬에서 같은 버전으로 재현하려면 저장소 루트에서 실행합니다.
+
+```sh
+gitleaks git --config .gitleaks.toml --redact=100 --log-opts="--full-history --diff-merges=first-parent HEAD" .
+```
+
+커밋을 만들기 전에는 `git add` 후 `gitleaks git --staged --config .gitleaks.toml --redact=100 .`로 스테이징한 변경을 검사할 수 있습니다. 탐지 시 검사 작업이 실패하며 로그에서는 비밀값을 가립니다. 진짜 키가 이미 커밋됐다면 발급처에서 폐기·재발급하고 노출된 커밋을 확인하세요. 해당 줄만 삭제해도 이전 커밋에는 값이 남습니다.
