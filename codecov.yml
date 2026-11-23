@@ -1,0 +1,9 @@
+fixes:
+  - "src/::frontend/src/"
+flags:
+  backend:
+    paths:
+      - backend/
+  frontend:
+    paths:
+      - frontend/src/

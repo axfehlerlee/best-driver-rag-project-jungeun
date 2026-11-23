@@ -1,0 +1,58 @@
+name: Coverage
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Report pending backend setup
+        if: hashFiles('backend/requirements-dev.txt') == ''
+        run: echo 'backend/requirements-dev.txt is pending. Backend coverage was skipped.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-python@v7.1.0
+        if: hashFiles('backend/requirements-dev.txt') != ''
+        with:
+          python-version: '3.15.2'
+      - run: python -m pip install -r backend/requirements-dev.txt
+        if: hashFiles('backend/requirements-dev.txt') != ''
+      - run: python -m pytest backend/tests --cov --cov-config=.coveragerc --cov-report=xml:backend/coverage.xml
+        if: hashFiles('backend/requirements-dev.txt') != ''
+      - uses: codecov/codecov-action@v7.1.1
+        if: hashFiles('backend/requirements-dev.txt') != '' && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'))
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: backend/coverage.xml
+          flags: backend
+          disable_search: true
+          fail_ci_if_error: true
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Report pending frontend setup
+        if: hashFiles('frontend/package.json') == ''
+        run: echo 'frontend/package.json is pending. Frontend coverage was skipped.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v7.1.0
+        if: hashFiles('frontend/package.json') != ''
+        with:
+          node-version: '26.13.1'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run test:coverage
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: frontend
+      - uses: codecov/codecov-action@v7.1.1
+        if: hashFiles('frontend/package.json') != '' && github.actor != 'dependabot[bot]' && (github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'))
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          disable_search: true
+          fail_ci_if_error: true
