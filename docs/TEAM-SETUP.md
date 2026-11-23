@@ -206,12 +206,12 @@ services:
     volumes: ["./frontend/src:/app/src"]
 ~~~
 
-**루트 `.env.example`**은 팀에서 사용할 백엔드 연결 형식입니다. Supabase 대시보드의 Connect에서 해당 프로젝트의 **Session pooler** URI를 복사해 실제 호스트와 포트를 사용합니다. SQL 어댑터는 `DATABASE_URL`을 직접 읽습니다. 실행용 역할에는 담당 작업에 필요한 권한을 부여하고 스키마 변경은 DB 담당자의 마이그레이션 연결로 수행합니다. [Supabase 연결 가이드](https://supabase.com/docs/guides/database/connecting-to-postgres)
+**루트 `.env.example`**은 팀에서 사용할 백엔드 연결 형식입니다. Supabase 대시보드의 연결 메뉴(Connect)에서 해당 프로젝트의 세션 풀러(Session pooler) 연결 주소를 복사해 실제 호스트와 포트를 사용합니다. SQL 어댑터는 `DATABASE_URL`을 직접 읽습니다. 실행용 역할에는 담당 작업에 필요한 권한을 부여하고 스키마 변경은 DB 담당자의 마이그레이션 연결로 수행합니다. [Supabase 연결 가이드](https://supabase.com/docs/guides/database/connecting-to-postgres)
 
 ~~~dotenv
-# fixture 모드는 외부 인증 없이 시작합니다.
+# 예시 데이터 모드는 외부 인증 없이 시작합니다.
 RAG_MODE=fixture
-# live 모드는 실제 Session pooler URI를 사용하고 비밀번호는 URL 인코딩합니다.
+# 실제 데이터 모드는 세션 풀러 연결 주소를 사용하고 비밀번호는 URL 인코딩합니다.
 DATABASE_URL=postgresql://ROLE.PROJECT_REF:PASSWORD@POOLER_HOST:5432/postgres?sslmode=require
 OPENAI_API_KEY=
 CHAT_MODEL=
@@ -223,7 +223,9 @@ EMBEDDING_MODEL=
 **첫 통합 확인.** 진입점·UI·의존성 파일을 만든 뒤 저장소 루트에서 실행합니다. 빈 검색기를 쓰면 두 포트 모두 HTTP 200과 `insufficient_evidence`를 반환해야 합니다. 실제 어댑터로 전환한 뒤에는 구 규칙 1건과 공통 품목 1건으로 반복하고 인용된 원문을 엽니다.
 
 ~~~sh
-cp .env.example .env
+if [ ! -e .env ]; then
+  cp .env.example .env
+fi
 docker compose config --quiet
 docker compose up --build -d
 curl -sS http://localhost:8000/chat -H 'Content-Type: application/json' \
