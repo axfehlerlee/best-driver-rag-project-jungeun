@@ -19,3 +19,7 @@ jobs:
       - run: uv sync --locked
       - name: Ruff lint
         run: uv run --locked ruff check --output-format=github src scripts tests app.py
+      - name: Ruff format check
+        # 린트가 실패해도 포맷 결과를 함께 보도록 앞 단계 결과와 무관하게 실행한다.
+        if: ${{ !cancelled() }}
+        run: uv run --locked ruff format --check --diff src scripts tests app.py
