@@ -4,10 +4,11 @@
 
 ## 초기 구조의 검사 범위
 
-현재는 폴더 구조를 준비한 단계다. 앱 코드와 기능 테스트, 실제 RAG 실행 결과는 아직 없다. [커버리지 워크플로](../.github/workflows/coverage.yml)는 항상 `uv sync --locked`로 기존 Python 환경을 확인한다.
+현재는 폴더와 Python 파일 뼈대를 준비한 단계다. 기능 구현과 기능 테스트, 실제 RAG 실행 결과는 아직 없다. [커버리지 워크플로](../.github/workflows/coverage.yml)는 항상 `uv sync --locked`로 기존 Python 환경을 확인한다.
 
-- `src/` 아래 Python 파일과 루트 `app.py`가 모두 없으면 테스트와 커버리지를 실행하지 않고, GitHub Actions 요약에 미구현 상태를 기록한다.
-- 둘 중 하나에 Python 코드가 생기면 `tests/`의 pytest를 실행한다. 코드만 추가하고 수집할 테스트가 없으면 pytest의 실패를 그대로 드러낸다.
+- `src/`, `scripts/` 또는 `app.py`에 Python 파일이 있으면 `compileall`로 문법을 검사한다.
+- `tests/`에 `test_*.py` 또는 `*_test.py` 파일이 있으면 pytest와 커버리지를 실행한다. 테스트 파일이 없으면 Actions 요약에 기능 테스트와 커버리지를 실행하지 않았다고 기록한다.
+- 테스트 파일은 있지만 수집에 실패하거나 테스트가 실패하면 pytest 오류를 그대로 드러낸다. 뼈대의 문법 검사 성공을 기능 검증 통과로 취급하지 않는다.
 - Streamlit 화면도 Python 검사 범위에 포함한다. Node 설치와 Next.js 테스트 작업은 사용하지 않는다.
 
 기존 검사 이름을 이어가기 위해 워크플로의 job ID `backend`는 유지한다. 이 이름이 별도 HTTP 백엔드를 요구한다는 의미는 아니다.
@@ -35,7 +36,7 @@ PR을 열거나 갱신할 때와 `main` 또는 `dev`에 푸시할 때 검사한�
 
 ## 의존성과 런타임
 
-기존 `.python-version`, `pyproject.toml`과 `uv.lock`을 함께 사용한다. 이번 폴더 구조 변경에서는 Python, uv, 패키지와 GitHub Actions 버전을 바꾸지 않는다. 새 기능에 필요한 패키지는 해당 구현 PR에서 추가하고 잠금 파일과 실제 설치 결과를 함께 확인한다.
+`.python-version`과 `pyproject.toml`은 Python `3.13.14`로 맞추고 `uv.lock`도 같은 환경을 기준으로 관리한다. CI는 `.python-version`을 읽어 같은 Python 버전을 설치한다. uv와 GitHub Actions 버전은 유지한다. 새 기능에 필요한 패키지는 해당 구현 PR에서 추가하고 잠금 파일과 실제 설치 결과를 함께 확인한다.
 
 [Dependabot 설정](../.github/dependabot.yml)은 루트 Python 의존성인 `uv`와 `github-actions`를 매주 확인한다. 새 Dockerfile 등 별도 관리 대상이 생기면 실제 파일과 실행 환경을 확인한 뒤 해당 항목을 추가한다.
 
