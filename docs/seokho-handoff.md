@@ -28,6 +28,16 @@ uv run python -m scripts.evaluate --cases tests/fixtures/handoff_eval.json --out
 
 HTML/JSON 비교용 입력은 `scripts.index --content-format html` 또는 `--content-format json`으로 서로 다른 색인 파일에 저장할 수 있다. 형식별 분리만으로 동등한 내용이나 성능 비교가 검증되는 것은 아니다.
 
+## 직접 질문 입력
+
+```powershell
+uv run --locked python -m scripts.chat --demo
+```
+
+구를 입력한 뒤 질문을 계속 입력한다. `품목알파`는 구별 합성 안내를 반환하고, `공통시험품목`은 공통 합성 문서를 사용한다. `없는품목오메가`는 근거 부족을 확인하는 예시다. `/구 송파구` 또는 `/구`로 지역을 변경하고 `/종료`로 종료한다. 빈 질문은 건너뛰며 Ctrl+C와 입력 종료도 지원한다.
+
+각 질문은 독립 처리하므로 이전 질문이나 추가 확인 답변을 이어서 해석하지 않는다. 실제 분리배출 규칙과 LLM은 연결되어 있지 않다. 색인은 합성 문서로 자동 준비하며 원본 기록은 실행마다 새로운 `results/local/chat-demo-<실행 식별자>/runs/`에 남긴다. 터미널에서는 HTML 태그를 읽기 쉬운 문자열로 표시하고 기록에는 원본 응답을 보존한다. `--output-dir`를 직접 지정하면 아직 존재하지 않는 폴더여야 한다.
+
 ## 자료를 교체하는 방법
 
 입력은 역할에 따라 세 가지로 구분한다.
@@ -194,9 +204,10 @@ print(response.status, response.answer)
 
 Python 3.13.14 환경에서 확인한 결과는 다음과 같다.
 
-- 전체 테스트 179개가 통과했다. `pytest tests --cov --cov-config=.coveragerc --cov-report=xml:coverage.xml`로 실행했고, `src`, `scripts`, `app.py`의 `compileall`도 통과했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
+- 직접 질문 실행기 검사를 포함한 전체 테스트 183개가 `pytest tests`에서 통과했다. `src`, `scripts`, `app.py`의 `compileall`도 통과했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
 - 실제 데모 CLI에서 출처 목록 4건과 첨부 21건을 읽고, 합성 문서 3개의 청크와 실행 JSON 3개를 생성했다. 결과는 `answered`, `needs_clarification`, `insufficient_evidence`로 구분됐다.
 - 색인 CLI의 기본 64차원 결과를 평가 CLI가 읽는 흐름, 연결 함수 오류의 기록과 종료 코드 1, 재실행 시 기존 결과를 덮어쓰지 않는 동작을 통합 테스트로 확인했다.
+- 직접 질문 CLI에서는 구 변경에 따른 답변/출처, 근거 부족, 지역 재질문, 빈 입력과 종료, 원본 기록 보존을 확인했다.
 
 실제 외부 API, DB와 팀 모듈 연결은 검증하지 않았다. 위 결과는 로컬 공통 흐름과 오류 처리의 검증이며, 실제 분리배출 답변 정확도나 HTML/JSON 성능 비교 결과가 아니다.
 
