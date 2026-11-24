@@ -50,7 +50,7 @@ Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring�
 
 ## 파일별 구현 상태
 
-수집/전처리와 공통 기반은 아래에 구현된 범위를 적었다. 질문 정제, 검색/지역/장소, 답변 생성과 화면/관찰 검증에는 아직 역할만 표시한 뼈대가 남아 있다. 타입은 `src/contracts.py`, 실제 함수 시그니처와 실행 방법은 [인계 문서](seokho-handoff.md)를 기준으로 한다. 담당자는 내부 파일을 확장할 수 있으며 공용 호출 경계 변경은 사용하는 담당자와 맞춘다.
+The tables below distinguish implemented entry points from team integration targets. See [runtime wiring](TEAM-SETUP.md#p04-runtime-handoff) for the current resolver and answer boundaries.
 
 ### 데이터 수집과 질문 정제 (이정은)
 
@@ -70,22 +70,24 @@ Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring�
 
 공통 청커는 전처리 JSON의 원문 `text`를 사용하며 `search_text` 정규화는 아직 검색 입력에 적용하지 않는다. 새 HWP를 다시 추출하려면 `annexes.py`가 사용하는 별도 `hwp5proc` 환경이 필요하지만, 저장소 인계 자료를 읽는 준비/색인 명령에는 필요하지 않다.
 
-### 검색과 지역 및 장소 조회 (이명지, 구현 예정)
+### Retrieval, region and place lookup (Lee Myungji)
 
 | 파일 | 역할 |
 | --- | --- |
-| `src/retrieval/regions.py` | 구와 동 이름 해석 |
+| `src/retrieval/regions.py` | Implemented in PR #11. `resolve_request` uses selected/explicit districts and a four-dong practice map, and requests clarification for ambiguous or conflicting inputs. |
 | `src/retrieval/search.py` | A/B/C 검색 |
 | `src/retrieval/spots.py` | 장소 저장과 조회 |
 | `src/evaluation/retrieval_metrics.py` | 검색 지표 |
 
-### 답변 생성과 품질 추적 (강성수, 구현 예정)
+### Answer generation and quality tracking (Kang Seongsu)
 
 | 파일 | 역할 |
 | --- | --- |
-| `src/generation/answer.py` | 근거 기반 답변과 응답 정책 |
-| `src/evaluation/answer_metrics.py` | 답변 자동 평가 |
-| `src/observability/tracing.py` | Langfuse 추적 |
+| `src/generation/answer.py` | Answer policy, clarification, insufficient evidence, error handling and version-aware source citations. |
+| `src/generation/pipeline_adapter.py` | Converts the shared request and selected chunks into generation input and returns validated citation IDs. |
+| `src/evaluation/answer_experiments/` | Local vector/BM25 ranking comparison, P04 answer probes and CSV export. |
+| `src/evaluation/answer_metrics.py` | Planned answer-quality scoring. |
+| `src/observability/tracing.py` | Planned Langfuse tracing. |
 
 ### 화면과 관찰 검증 (이승주, 구현 예정)
 
@@ -121,7 +123,7 @@ Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring�
 | `scripts/index.py` | 명시한 공용 문서의 색인 생성, HTML/JSON 형식 선택 |
 | `scripts/evaluate.py` | 데모 또는 팀 연결 함수로 평가 실행, 결과 파일 저장 |
 
-원문 수집과 HWP 전처리는 PR 8 담당 범위이며 공통 기반은 제공된 산출물을 사용한다. 실제 구조 청킹과 임베딩 색인, 근거 조회는 연결됐지만 팀 A/B/C 검색, 질문 변환 모델, 동 이름 추론, 답변 LLM, 장소 DB와 지도는 연결되지 않았다. 데모의 해시 검색과 본문 인용은 공통 흐름 확인용이며 실제 RAG 품질을 입증하지 않는다. 단위/통합 테스트와 CLI 실행 검증 결과는 [최소 구현 인계](seokho-handoff.md#구현-경계와-검증)에 기록한다.
+PRs #8 and #10 provide the reviewed ingestion bundle. The shared runtime accepts the resolver and answer callbacks. The team A/B/C retriever, production answer model, rewrite model, place database and map remain integration work. The [P04 results](../results/testData.md) measure offline experiments.
 
 초기 파일별 구현 항목과 플로우 차트는 [Notion 구조 문서](https://app.notion.com/p/422dc8b0e1638150b62acfe703074f30?pvs=204)에 있다. 현재 구현된 규격과 동작은 저장소 코드와 최소 구현 인계 문서를 기준으로 확인한다.
 

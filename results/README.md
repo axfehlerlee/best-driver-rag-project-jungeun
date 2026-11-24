@@ -6,6 +6,12 @@
 
 공통 기반과 통합 담당자(양석호)가 실행과 원본 저장을 연결한다. 검색 지표와 답변 평가는 각 담당자가 제공하고 화면과 관찰 검증 담당자(이승주)가 결과 비교와 실패 분석에 활용한다.
 
+## P04 experiment exports
+
+The [P04 comparison](testData.md) links the committed CSV snapshot. Use the [benchmark command](../README.md#test-the-answer-and-region-changes-after-pulling-dev) to reproduce it in a new directory under `results/local/`. Each of `vector/`, `ensemble/` and `answers/` has its own `runs.csv` and `candidates.csv`. Join rows on `run_id`. A blank candidate count means no candidate list was received. A zero is a completed search with no hits.
+
+The two retrieval directories report rankings and timings. The answer directory uses separately supplied evidence for the three trick questions. The shared runtime writes a JSON run record. The experimental CSV exporter runs through the benchmark entry point.
+
 최초 실패, 재시도와 변경 후 추가 실험은 별도로 남긴다. `RunRecord.duration_ms`는 기록 파일 저장 전까지의 파이프라인 시간이며 리라이트 시간을 포함한다. 현재 토큰 사용량, API 비용과 Ragas 사후 평가 시간은 자동 수집하지 않는다. 합성 데모는 `run_kind="demo"`로 기록하며 실제 검색/생성 결과와 구분한다.
 
 이 폴더 전체를 Git에서 제외하지 않는다. 제출용 기록은 비밀값과 공유 가능 여부를 검토해 포함하며, 큰 기록은 관리 위치, 버전과 접근 방법을 남긴다. 로컬 실험용 `local/`은 제외한다. [평가 기준](../docs/problem.md)을 기준으로 비교하며 결과를 검색 색인에 넣지 않는다.

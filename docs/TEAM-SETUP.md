@@ -25,7 +25,17 @@ UI는 Streamlit으로 구현하고 공통 Python RAG 함수를 직접 호출하�
 
 같은 형식을 각 모듈에 복제하지 않는다. 공용 규격 변경은 호출 코드, 예시, 검증과 문서를 함께 맞춘다. 내부 파일과 함수 구성은 담당자가 정한다.
 
-현재 `create_runtime`은 지역 해석, 검색, 생성과 선택적 질문 변환/장소 조회 함수를 받아 연결한다. A/B/C 값이나 콜백이 공용 규격에 있다는 사실은 해당 알고리즘의 구현 완료를 뜻하지 않는다. 실제 팀 검색/리라이트/지역 추론/생성/장소 함수는 시작 뼈대이며, 준비된 구현을 [최소 구현 인계의 호출 규격](seokho-handoff.md#공용-규격과-팀-연결)에 맞춰 연결한다. `RAGPipeline.run`은 `RunRecord`를 반환하고 사용자 응답은 그 안의 `response`로 읽는다.
+### P04 runtime handoff
+
+Pass `src.retrieval.regions.resolve_request` as the resolver and `make_answer_generator(draft_p04_answer, decode_conditions=decode_p04_conditions)` as the generator to `create_runtime`. Supply a retriever that returns ranked `SearchCandidate` objects. Read the response from `runtime.run(request).response`. The [fixed-evidence test](../tests/unit/answer_experiments/test_p04_pipeline_answers.py) shows the request, chunk and citation contracts. It injects a controlled resolver and retriever.
+
+| Input to the PR #11 resolver with the same reviewed color chunk available | Observed runtime behavior |
+| --- | --- |
+| Yeonhui-dong color question with Seodaemun-gu explicitly selected | Retrieval receives Seodaemun-gu. Generation answers with the reviewed colors and cites the supplied chunk. |
+| Same question with only the dong in the text | Retrieval receives the inferred Seodaemun-gu. Generation receives the original request without a district, so the P04 reviewed-color path returns `insufficient_evidence`. |
+| Same question with Songpa-gu explicitly selected | Resolution requests clarification before retrieval or generation. |
+
+For the current P04 color check, pass the district explicitly. A shared contract decision is needed if the generator must use inferred scope. Preserve the original question and record the resolved region separately. The practice map contains four dongs. Wirye is a fixed-evidence observation with Songpa-gu supplied explicitly.
 
 ## 질문, 지역과 답변
 

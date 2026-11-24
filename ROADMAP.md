@@ -6,13 +6,13 @@
 
 ## 현재 도달지점
 
-2026-11-24 기준으로 공통 기반과 합성 응답 흐름에 더해, PR 8의 실제 전처리 결과를 XML 유래 HTML/JSON으로 연결하고 `text-embedding-3-small` 색인을 만들었다. 실제 질문의 근거 조회도 실행했으나 관련 별표가 상위 결과에서 빠지는 사례가 남아 있다. 검증 수치와 범위는 [인계본 검증 기록](docs/seokho-handoff.md#구현-경계와-검증)에 둔다. STEP 3의 자료/색인 연결 일부에 도달한 상태이며 팀 전체 STEP 1~7 완료를 뜻하지 않는다.
+As of 2026-11-24, PRs #8 and #10 supply the reviewed P04 bundle, and PR #11 supplies a district resolver. The answer branch adds fixed-evidence runtime tests and a two-retriever experiment. These cover parts of Steps 2–4. The final 20-question evaluation remains pending.
 
 | 영역 | 현재 구현과 검증 | 연결에 남은 일 |
 | --- | --- | --- |
-| 자료와 색인 | PR 8 전처리 묶음 검증, XML→HTML/JSON 공용 문서, 조문/표 행과 같은 구획 비고를 보존한 청킹, 실제 임베딩과 형식별 로컬 색인 | 검색 품질에 맞춘 청킹 개선, bge-m3 후속 비교, 팀 검색/DB 연결 |
-| 질문과 실행 기록 | 실제 색인의 지역 제한 근거 조회, 공통 콜백 파이프라인, 합성 응답/인용 검사와 실행 원본 저장 | 실제 A/B/C 검색, 지역/동 해석, 리라이트, 답변 모델, getSpot/장소 조회와 Streamlit 연결 |
-| 평가 | 합성 문서에서 답변 가능/지역 재질문/근거 부족을 확인하고 구성별 실행 결과를 남기는 실행기 | 원문 근거를 확인한 개발 10문항과 최종 20문항 연결, Ragas/Hit@5/Langfuse, 최종 80건과 HTML/JSON 품질 비교 |
+| Data and index | Reviewed P04 bundle, HTML/JSON document pairs, article/row chunking and local embedding indexes | Refine chunking, compare bge-m3 and connect the team retriever and database |
+| Questions and runs | District resolution, scoped context selection, answer and citation validation, per-run JSON and experimental CSVs | Pass inferred location to generation, integrate production A/B/C retrieval, rewrite, answer model, places and UI |
+| Evaluation | Six regular/trick questions for ranking and fixed-evidence checks, with Wirye tracked as an observation | Integrate the development and final sets, Ragas, Hit@5 and Langfuse, and run the final comparison |
 
 실제 자료의 색인과 단순 근거 조회까지 연결했으며, STEP 3의 답변 생성까지 포함한 전체 흐름과 이후 최종 평가 진입 조건은 아직 확인하지 않았다. 현재 형식 비교는 같은 원문 `text`를 사용하며 JSON의 `search_text` 정규화 효과를 측정하지 않는다. 검색 품질 우열과 bge-m3 비교 결과는 아직 없다.
 

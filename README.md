@@ -4,14 +4,14 @@
 
 팀의 최종 목표는 Streamlit 화면, A/B/C 검색, 동 이름 인식, 질문 다듬기와 getSpot 장소 지도다. 화면과 평가 실행기가 같은 Python RAG 함수를 호출하도록 연결한다.
 
-**2026-11-24 현재 실제 전처리 자료를 형식별로 색인하고 질문의 근거를 조회할 수 있다.** 제공된 XML은 HTML로 변환하고 전처리 JSON과 같은 원문 ID/버전으로 연결했다. `text-embedding-3-small`의 실제 색인을 만들었으며, 답변 생성과 팀 A/B/C 검색, Streamlit 연결은 남아 있다.
+**P04 can be tested locally with the reviewed HTML/JSON documents, the district resolver and an evidence-based answer callback.** The runtime accepts these components through dependency injection. The team A/B/C retriever, production answer model and Streamlit UI still need integration.
 
 | 구분 | 현재 상태 |
 | --- | --- |
-| 문서 처리 | PR 8 전처리 묶음 검증, XML→HTML/JSON 문서 쌍, 조문/표 행 청킹과 형식별 실제 임베딩 색인 구현 |
+| Documents | PR #8 supplied the P04 bundle. PR #10 corrected HWP text handling and form classification. The preparation CLI builds paired HTML/JSON chunks and supports optional embedding indexes. |
 | 공통 실행 | 팀 함수 연결, 지역별 근거 선택, 인용 검사, 실행 JSON 기록과 평가 실행기 구현 |
 | 직접 실행 | 실제 색인의 근거 조회 CLI와 API 키 없는 합성 응답 데모 실행 가능 |
-| 팀 기능 | 수집/전처리는 PR 8 결과 사용. A/B/C 검색, 지역/동 해석, 질문 변환 모델, 답변 LLM, 장소/지도, 품질 지표는 연결 전 |
+| Region and answer | PR #11 provides the district resolver with a four-dong practice map. The P04 generator reads fixed evidence and validates citations. Vector and BM25/vector ranking experiments run separately. |
 
 파일별 구현 범위와 검증 결과의 기준 문서는 [공통 기반 인계본](docs/seokho-handoff.md)이며, 담당자별 연결 지점은 [Notion 인수인계](https://app.notion.com/p/422dc8b0e16381758494e218a97087aa)에서도 확인할 수 있다. 검색/생성 연결 함수가 준비돼 있다는 사실과 실제 서비스가 동작한다는 사실을 구분한다.
 
@@ -31,7 +31,7 @@ uv run --locked python -m pytest --version
 
 ## 실제 자료 준비와 근거 조회
 
-수집과 HWP 전처리는 [PR 8](https://github.com/kssk3/best-driver-rag-project/pull/8)의 결과를 사용한다. 인계 자료는 저장소의 `data/handoff/jungeun/p04-2026-11-24/`에 포함돼 있으므로 저장소 루트에서 다음 명령을 실행한다. 출력에는 아직 없는 폴더를 지정한다.
+The tracked P04 handoff incorporates [PR #8](https://github.com/kssk3/best-driver-rag-project/pull/8) and the corrections in [PR #10](https://github.com/kssk3/best-driver-rag-project/pull/10). Run the following from the repository root and choose a new output directory.
 
 ```sh
 uv run --locked python -m scripts.prepare_data --bundle data/handoff/jungeun/p04-2026-11-24 --version v1 --output-dir data/processed/p04-v2-prepared
@@ -63,7 +63,21 @@ uv run --locked python -m scripts.demo
 
 API 키 없이 합성 문서 3개로 색인부터 답변, 지역 재질문, 근거 부족과 실행 기록 저장까지 확인한다. 실행할 때마다 `results/local/handoff-demo-<실행 식별자>/`에 색인과 결과 JSON을 만든다. 해시 임베딩과 본문 인용을 사용하는 연결 검사이며 실제 분리배출 안내나 검색 품질 평가 결과가 아니다.
 
-최신 `dev`의 PR 8을 통합한 상태에서 로컬 테스트 307개, 커버리지 XML 생성과 문법 검사를 통과했다. `uv sync --locked`로 설치한 새 Python 3.13.14 환경에서도 테스트 307개와 합성 데모의 세 응답 경로를 확인했다. 원격 CI 결과와 최종 20문항의 실제 품질 평가는 별도다. 테스트 명령과 CI 설정은 [검사와 의존성 관리](docs/CI-AND-DEPENDENCIES.md), 자세한 결과는 [인계본 검증 기록](docs/seokho-handoff.md#구현-경계와-검증)에 있다.
+### Test the answer and region changes after pulling dev
+
+With Python 3.13.14 and uv 0.13.9 or later, run these commands from the repository root after the answer PR merges. The P04 tests and benchmark use local evidence and require no model API key.
+
+```sh
+git switch dev
+git pull --ff-only origin dev
+uv sync --locked
+uv run --locked python -m pytest -q tests/unit/generation tests/unit/answer_experiments tests/unit/test_regions.py
+uv run --locked python -m src.evaluation.answer_experiments.p04_retrieval_benchmark --output-dir results/local/p04-team-check --repeats 10
+```
+
+Use a fresh output directory for each benchmark run. For the full suite, run `uv run --locked python -m pytest -q tests`. On the branch integrating PR #11, the focused suite passed 68 tests and 25 subtests, and the full suite passed 403 tests and 25 subtests on Python 3.13.14. Both emitted the existing LangChain Community deprecation warning.
+
+The [P04 comparison](results/testData.md) explains the saved CSVs and the three answer cases. The [runtime handoff](docs/TEAM-SETUP.md#p04-runtime-handoff) describes how an inferred district reaches retrieval and what the generator receives.
 
 입력 자료 규격, 색인/평가 명령과 팀 함수 연결 예시는 [인계 문서](docs/seokho-handoff.md)에 있다. `sources.json`은 문서 목록과 첨부 관계를 읽는 별도 입력이며 전처리 묶음 대신 넣지 않는다. OpenAI 임베딩 환경변수는 [.env.example](.env.example)을 참고한다.
 
