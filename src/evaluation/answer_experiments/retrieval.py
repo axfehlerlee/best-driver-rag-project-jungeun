@@ -54,7 +54,9 @@ def _character_ngrams(text: str) -> Counter[str]:
         if len(word) == 1:
             counts[word] += 1
         for size in (2, 3):
-            counts.update(word[start:start + size] for start in range(len(word) - size + 1))
+            counts.update(
+                word[start : start + size] for start in range(len(word) - size + 1)
+            )
     return counts
 
 
@@ -135,8 +137,10 @@ def prepare_adapters(
     scopes = tuple(dict.fromkeys(districts))
     eligible = sorted(
         (
-            item for item in documents
-            if item.eligible_for_disposal and (item.district is None or item.district in scopes)
+            item
+            for item in documents
+            if item.eligible_for_disposal
+            and (item.district is None or item.district in scopes)
         ),
         key=lambda item: item.document_key,
     )
@@ -150,7 +154,10 @@ def prepare_adapters(
                 page_content=item.evidence["text"],
                 metadata={
                     _DOCUMENT_KEY: item.document_key,
-                    "source": {**item.evidence["source"], _DOCUMENT_KEY: item.document_key},
+                    "source": {
+                        **item.evidence["source"],
+                        _DOCUMENT_KEY: item.document_key,
+                    },
                     "chunk_id": item.evidence["chunk_id"],
                 },
             )

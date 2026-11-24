@@ -26,8 +26,10 @@ class MemoryEmbeddingCache:
 
 
 def build_index(
-    chunks: list[Chunk], embedder: EmbeddingProvider,
-    *, cache: MemoryEmbeddingCache | None = None,
+    chunks: list[Chunk],
+    embedder: EmbeddingProvider,
+    *,
+    cache: MemoryEmbeddingCache | None = None,
 ) -> IndexSnapshot:
     if not chunks:
         raise ValueError("색인을 만들 청크가 없습니다.")
@@ -45,25 +47,42 @@ def build_index(
     generated = embedder.embed_documents(missing) if missing else []
     if not isinstance(generated, list) or len(generated) != len(missing):
         raise ValueError("임베딩 결과 개수가 요청한 본문 개수와 다릅니다.")
-    pending = {text: validate_vector(vector) for text, vector in zip(missing, generated)}
-    vectors = {text: pending[text] if text in pending else validate_vector(
-        cache.vectors[identity, text]
-    ) for text in texts}
+    pending = {
+        text: validate_vector(vector) for text, vector in zip(missing, generated)
+    }
+    vectors = {
+        text: pending[text]
+        if text in pending
+        else validate_vector(cache.vectors[identity, text])
+        for text in texts
+    }
     dimensions = {len(vector) for vector in vectors.values()}
     if len(dimensions) != 1:
         raise ValueError("임베딩 결과의 벡터 차원이 서로 다릅니다.")
-    entries = [IndexEntry(chunk=chunk, vector=vectors[chunk.content]) for chunk in chunks]
+    entries = [
+        IndexEntry(chunk=chunk, vector=vectors[chunk.content]) for chunk in chunks
+    ]
     signature = json.dumps(
-        {"embedding_identity": identity, "entries": [entry.model_dump() for entry in entries]},
-        ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        {
+            "embedding_identity": identity,
+            "entries": [entry.model_dump() for entry in entries],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
     )
     snapshot = IndexSnapshot(
         metadata=IndexMetadata(
             index_id="index-" + hashlib.sha256(signature.encode()).hexdigest(),
-            embedding_identity=identity, dimension=dimensions.pop(),
-            chunking_version=versions.pop(), source_document_versions=source_versions(chunks),
-        ), entries=entries,
+            embedding_identity=identity,
+            dimension=dimensions.pop(),
+            chunking_version=versions.pop(),
+            source_document_versions=source_versions(chunks),
+        ),
+        entries=entries,
     )
     # 전체 결과를 검사한 뒤에만 캐시에 반영하여 실패한 배치를 남기지 않는다.
-    cache.vectors.update({(identity, text): vector[:] for text, vector in pending.items()})
+    cache.vectors.update(
+        {(identity, text): vector[:] for text, vector in pending.items()}
+    )
     return snapshot

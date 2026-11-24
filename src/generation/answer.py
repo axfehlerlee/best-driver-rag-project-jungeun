@@ -55,9 +55,7 @@ class AnswerDraft(TypedDict):
 
 
 class AnswerOutput(TypedDict):
-    status: Literal[
-        "answered", "needs_clarification", "insufficient_evidence", "error"
-    ]
+    status: Literal["answered", "needs_clarification", "insufficient_evidence", "error"]
     message: str
     citations: list[dict[str, str | None]]
     error_kind: NotRequired[str]
@@ -125,7 +123,9 @@ def generate_answer(
         return _error("invalid_draft")
     status = draft.get("status")
     if status == "source_conflict":
-        return _respond_to_conflict(draft.get("conflict_sides"), model_input["evidence"])
+        return _respond_to_conflict(
+            draft.get("conflict_sides"), model_input["evidence"]
+        )
     if status == "insufficient_evidence":
         return _insufficient_evidence()
 
@@ -143,7 +143,8 @@ def generate_answer(
         "status": "answered",
         "message": message,
         "citations": [
-            _citation(model_input["evidence"][index]) for index in dict.fromkeys(indices)
+            _citation(model_input["evidence"][index])
+            for index in dict.fromkeys(indices)
         ],
     }
 
@@ -229,7 +230,9 @@ def _same_source(left: dict[str, str], right: dict[str, str]) -> bool:
 
 
 def _condition_missing(value: object) -> bool:
-    return value is None or value == [] or (isinstance(value, str) and not value.strip())
+    return (
+        value is None or value == [] or (isinstance(value, str) and not value.strip())
+    )
 
 
 def _valid_evidence(entry: object) -> bool:
@@ -244,7 +247,9 @@ def _valid_evidence(entry: object) -> bool:
             isinstance(key, str) and isinstance(value, str)
             for key, value in source.items()
         )
-        and bool(_source_identity(source).keys() & (_SOURCE_ALIASES | {"evidence_file"}))
+        and bool(
+            _source_identity(source).keys() & (_SOURCE_ALIASES | {"evidence_file"})
+        )
         and _nonempty_text(entry.get("text"))
         and (chunk_id is None or _nonempty_text(chunk_id))
     )
