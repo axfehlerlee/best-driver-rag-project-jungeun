@@ -6,7 +6,7 @@
 
 구현 위치는 `src/ingestion/loaders.py`다. 기존 Python 3.13.14 환경과 Pydantic을 사용한다. 다른 모듈에서는 아래 함수를 가져와 호출한다.
 
-원본 저장소는 [best-driver-rag-project](https://github.com/kssk3/best-driver-rag-project)다. 구현 기준은 `feature/seokho/shared-contracts`의 로컬 커밋 `f626dd28cafdef756a6845c02eee49c72f1ce517`이며 원격에 push하지 않았다. 이 문서는 프로젝트 내부에서 사용하는 목록 로더를 설명한다.
+이 문서는 현재 체크아웃의 `load_source_manifest` API를 설명한다. 같은 파일의 본문 로더와 이후 청킹/색인 연결은 [공통 기반 최소 인계본](seokho-handoff.md)을 따른다.
 
 ```python
 from pathlib import Path
@@ -25,7 +25,7 @@ for source in sources:
 
 ## 공개 API
 
-```python
+```text
 load_source_manifest(path: str | Path) -> list[SourceManifestEntry]
 ```
 
@@ -89,22 +89,16 @@ except OSError as error:
 
 ## 원문 처리와의 경계
 
-이 로더의 완료 범위는 문서 목록과 첨부 관계 읽기다. `SourceDocument`와 `Chunk` 규격은 변경하지 않는다. HWP/PDF 추출, 전처리 HTML/JSON 본문 연결, ID와 버전 발급, 청킹, 색인 생성과 질문 응답은 포함하지 않는다.
+`load_source_manifest`의 완료 범위는 문서 목록과 첨부 관계 읽기다. 이 함수는 `SourceDocument`나 `Chunk`를 만들지 않으며 ID/버전 발급, 다운로드와 HWP/PDF 추출을 수행하지 않는다.
+
+같은 모듈에는 공용 문서 목록을 읽는 `load_source_documents`와 전처리 파일에 명시적인 메타데이터를 연결하는 `load_preprocessed_content`도 구현돼 있다. 이후 청킹, 색인과 질문 실행은 각각 별도 함수가 담당한다. 제공된 검수 ZIP의 개별 JSON을 자동 변환하거나 목록의 URL을 따라 본문을 가져오는 기능은 아직 없다.
 
 ## 검증
 
-2026-11-24에 전체 테스트 79개가 통과했다. 기존 문서 규격 테스트 40개와 로더 테스트 39개를 포함한다. 제공된 원본 `sources (1).json`과 테스트 fixture에서 문서 4건과 첨부 21건, 배열 순서와 번호의 앞자리 0이 보존되는 것을 확인했다. 빠른 시작 예제에서도 시행일이 `date`로 변환되고 첨부 번호 `000700`이 유지됐다.
+2026-11-24에 목록 로더 테스트 39개가 통과했다. 제공된 원본 `sources (1).json`과 테스트 fixture에서 문서 4건과 첨부 21건, 배열 순서와 번호의 앞자리 0이 보존되는 것을 확인했다. 빠른 시작 예제에서도 시행일이 `date`로 변환되고 첨부 번호 `000700`이 유지됐다. 전체 프로젝트의 최신 검증 범위는 [인계본 검증 기록](seokho-handoff.md#구현-경계와-검증)에 둔다.
 
-로더 테스트는 부모별 첨부 관계, 삭제/서식 항목 보존, 빈 목록, UTF-8 BOM, 잘못된 JSON과 키/타입/날짜/주소/경로, 중복 일련번호와 첨부 번호를 확인한다. `SourceDocument` 파일은 이번 구현에서 변경하지 않았다.
+로더 테스트는 부모별 첨부 관계, 삭제/서식 항목 보존, 빈 목록, UTF-8 BOM, 잘못된 JSON과 키/타입/날짜/주소/경로, 중복 일련번호와 첨부 번호를 확인한다. 목록 로딩은 본문용 `SourceDocument` 정의와 독립적으로 검증한다.
 
-CI와 같은 범위인 `src`, `scripts`, `app.py`의 Python 문법 컴파일도 통과했다.
-
-Windows 기본 임시 폴더의 접근 오류로 테스트 준비 단계가 실패해, 프로젝트 `.cache` 아래 새 임시 경로를 `--basetemp`로 지정한 뒤 전체 테스트를 실행했다. 같은 환경에서 재현할 때는 매번 새 경로를 사용한다.
-
-```powershell
-New-Item -ItemType Directory -Path '.cache' -Force | Out-Null
-$manifestTestTemp = Join-Path (Get-Location) ('.cache/pytest-manifest-' + [guid]::NewGuid().ToString('N'))
-.venv/Scripts/python.exe -m pytest tests -q --basetemp $manifestTestTemp
-```
+실행 명령과 Windows 임시 폴더 접근 오류의 재현 방법은 [검사와 의존성 관리](CI-AND-DEPENDENCIES.md)에 모은다.
 
 이 검증은 목록 로딩 범위다. 원문 추출이나 실제 검색/답변 성능을 확인한 결과는 아니다.

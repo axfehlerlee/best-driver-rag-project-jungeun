@@ -7,8 +7,8 @@
 저장소 루트에서 실행한다. 프로젝트 환경은 Python 3.13.14이며 `uv` 0.13.9 이상을 사용한다. 다음 명령의 `uv run`은 프로젝트 가상환경을 사용한다.
 
 ```powershell
-uv sync --frozen
-uv run python -m scripts.demo --output-dir results/local/handoff-demo
+uv sync --locked
+uv run --locked python -m scripts.demo
 ```
 
 데모는 합성 문서, 외부 API를 호출하지 않는 해시 임베딩과 원문 인용 생성기를 사용한다. API 키가 필요하지 않다. 데모 성공은 파일 읽기, 색인, 공통 호출과 기록 연결을 확인하는 것이며, 의미 검색이나 실제 LLM 답변 성능의 증거가 아니다.
@@ -18,8 +18,8 @@ uv run python -m scripts.demo --output-dir results/local/handoff-demo
 색인과 평가를 따로 실행할 때는 다음 진입점을 사용한다.
 
 ```powershell
-uv run python -m scripts.index --documents tests/fixtures/handoff_documents.json --output data/indexes/demo.json --demo --dimensions 128
-uv run python -m scripts.evaluate --cases tests/fixtures/handoff_eval.json --output-dir results/local/handoff-eval --demo --settings configs/demo.json
+uv run --locked python -m scripts.index --documents tests/fixtures/handoff_documents.json --output data/indexes/demo.json --demo --dimensions 128
+uv run --locked python -m scripts.evaluate --cases tests/fixtures/handoff_eval.json --output-dir results/local/handoff-eval --demo --settings configs/demo.json
 ```
 
 `--documents`에는 공용 `SourceDocument` 목록을 지정한다. 출처 목록인 `sources.json`, 검수 ZIP 전체와 평가 정답표는 이 입력에 넣지 않는다. 색인은 명시한 출력 파일을 교체하며, 입력 문서와 출력 색인 경로는 달라야 한다. `data/indexes/`와 `results/local/`의 생성물은 Git 추적 대상에서 제외된다.
@@ -50,7 +50,7 @@ uv run --locked python -m scripts.chat --demo
 
 세 함수는 `src/ingestion/loaders.py`에 있다. 폴더를 자동 탐색하지 않으며, 지정한 파일만 읽는다. UTF-8과 UTF-8 BOM을 지원한다. 목록의 `본문_파일`은 기재된 경로이며 파일 보관 완료를 뜻하지 않는다.
 
-단일 전처리 파일을 연결하는 예시는 다음과 같다. 아래 ID와 버전, URL은 합성 예시다. 실제 자료의 ID 발급과 개정 이력 관리는 로더가 수행하지 않는다.
+단일 전처리 파일을 연결하는 예시는 다음과 같다. `data/processed/example-annex.html`은 사용자가 준비할 본문 파일이며 저장소에 포함되어 있지 않다. 아래 ID와 버전, URL은 합성 예시다. 실제 자료의 ID 발급과 개정 이력 관리는 로더가 수행하지 않는다.
 
 ```python
 from src.ingestion.loaders import load_preprocessed_content
@@ -163,14 +163,14 @@ print(response.status, response.answer)
 
 ## 설정, 실행 기록과 평가
 
-`load_settings(path=None, project_root=None)`은 명시한 JSON 설정을 `RuntimeSettings`로 읽는다. 설정을 생략하면 모델 기본값을 사용한다. `index_path`와 `runs_path`의 상대 경로 기준은 `project_root` 또는 현재 작업 폴더다. API 키와 비밀값은 이 JSON이나 실행 기록에 넣지 않고 제공자 환경변수로 전달한다.
+`load_settings(path=None, project_root=None)`은 명시한 JSON 설정을 `RuntimeSettings`로 읽는다. 설정을 생략하면 모델 기본값을 사용한다. `index_path`와 `runs_path`의 상대 경로 기준은 `project_root` 또는 현재 작업 폴더다. API 키와 비밀값은 이 JSON이나 실행 기록에 넣지 않고 제공자 환경변수로 전달한다. `.env.example`은 필요한 변수 이름의 예시이며 현재 CLI는 `.env` 파일을 자동 로드하지 않는다.
 
 | 설정 | 의미 |
 | --- | --- |
 | `index_path` | 사용할 로컬 색인 파일 |
 | `runs_path` | 실행 원본 JSON을 저장할 폴더 |
 | `max_document_characters` | 문서 전체 청킹의 문자 수 한도 |
-| `demo_dimensions` | `scripts.demo`에서 새 색인을 만들 때 사용할 데모 임베딩 차원 |
+| `demo_dimensions` | `scripts.demo`와 `scripts.chat`이 새 색인을 만들 때 사용할 데모 임베딩 차원 |
 | `pipeline` | 검색 변형, 질의 변환 사용, top-k, 생성 입력 문자 한도와 실행 버전 |
 
 `create_runtime`은 콜백과 기록기를 연결하며 자동으로 실제 DB나 모델을 생성하지 않는다. `RunRecorder`는 실행마다 `<run_id>.json`을 생성하고 같은 실행 ID 파일을 덮어쓰지 않는다. 기록에는 원질문, 해석된 지역과 질의(`resolved_query`), 실제 검색 질의, 후보, 생성 입력 ID, 답변/인용, 단계별 상태와 시간이 들어간다. `RunRecord.duration_ms`는 기록 파일 저장 전까지의 파이프라인 시간이다. 토큰 사용량, API 비용과 Langfuse trace는 현재 자동 수집하지 않는다.
@@ -178,6 +178,8 @@ print(response.status, response.answer)
 `load_evaluation_cases(path)`는 평가 문항 배열 또는 `{"is_synthetic": true, "cases": [...]}` 포장을 읽는다. `evaluate_cases(cases, pipelines)`는 구성 이름을 키로 하는 파이프라인 딕셔너리를 받아 모든 문항/구성을 실행하고, `case_id`, 구성 이름, 실제 실행 ID, 응답과 원본 기록을 반환한다. 호출 실패도 `error` 결과로 남긴다. Ragas나 Hit@5를 계산하지 않으며, 반환된 실제 결과에 후속 평가를 붙이는 경계다.
 
 실제 팀 함수를 평가 CLI에 연결할 때는 `--demo` 대신 `--factory 모듈명:함수명`을 지정한다. 이 함수는 `RuntimeSettings`를 인자로 받고 `RAGPipeline` 한 개 또는 구성 이름을 키로 하는 `dict[str, RAGPipeline]`을 반환해야 한다. 평가 파일에서 실행 코드를 읽지 않으며, 명령행에 명시한 연결 함수만 불러온다. 서로 다른 설정을 비교하려면 연결 함수가 각 설정의 파이프라인을 만들어 반환한다. 데모의 `--demo` 경로는 합성 구성 한 개를 실행한다.
+
+개별 `runs/<run_id>.json`도 저장하려면 연결 함수가 `create_runtime` 등으로 기록기를 붙여야 한다. 평가 CLI는 반환된 파이프라인에 기록기를 강제로 추가하지 않는다. 기록기를 생략해도 정상 반환된 `RunRecord`는 `evaluation.json` 안에 포함된다.
 
 `create_demo_pipeline(settings)`는 이미 저장된 데모 색인을 읽고, 해시 벡터와 간단한 단어 포함 조건으로 후보를 선택한다. A 호출 형태만 지원하며 실제 팀 A 검색 품질 구현은 아니다. 데모의 질의 변환은 공백 정리이고, 생성기는 첫 근거 본문을 표시한다. B/C 검색, 실제 질문 변환과 답변 모델의 성능을 대신하지 않는다.
 
@@ -196,13 +198,14 @@ print(response.status, response.answer)
 | `src/evaluation/runner.py` | 같은 공통 흐름으로 평가 사례 실행 | Ragas, Hit@5, 사람 채점과 최종 비교 |
 | `src/config.py`, `src/runtime.py` | 설정 읽기와 함수 연결 | 실제 서비스의 설정 및 자원 생성 |
 | `src/demo.py`, `scripts/demo.py` | 외부 API 없는 합성 흐름 확인 | 실제 서비스 성능 평가로 대체하지 않음 |
+| `scripts/chat.py` | 구 선택과 반복 질문 입력, 출처 표시 | 합성 자료 전용이며 대화 기억과 실제 지역 추론 없음 |
 | `scripts/index.py`, `scripts/evaluate.py` | 명시적인 입력/출력 파일을 받는 CLI | 실제 자료와 검증용 사례 경로 |
 
 ## 구현 경계와 검증
 
 이 인계본에는 실제 팀 A/B/C 검색, 질문 변환 모델, 답변 LLM, 지도 UI, 장소 DB, Ragas와 Langfuse 연동이 포함되지 않는다. Streamlit이나 HTTP 서버도 이 공통 기반의 실행 조건이 아니다. 데모의 해시 임베딩과 원문 인용 생성기는 연결 확인용이며 최종 20문항 평가나 HTML/JSON 성능 비교 결과로 사용하지 않는다.
 
-Python 3.13.14 환경에서 확인한 결과는 다음과 같다.
+2026-11-24, Python 3.13.14 환경에서 확인한 결과는 다음과 같다. 테스트 명령과 CI 설정은 [검사와 의존성 관리](CI-AND-DEPENDENCIES.md)를 따른다.
 
 - 직접 질문 실행기 검사를 포함한 전체 테스트 183개가 `pytest tests`에서 통과했다. `src`, `scripts`, `app.py`의 `compileall`도 통과했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
 - 실제 데모 CLI에서 출처 목록 4건과 첨부 21건을 읽고, 합성 문서 3개의 청크와 실행 JSON 3개를 생성했다. 결과는 `answered`, `needs_clarification`, `insufficient_evidence`로 구분됐다.
