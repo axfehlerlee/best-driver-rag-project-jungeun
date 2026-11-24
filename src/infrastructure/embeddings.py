@@ -5,6 +5,8 @@ from importlib.metadata import version
 import json
 import math
 import os
+from pathlib import Path
+import re
 from typing import Protocol
 
 
@@ -78,3 +80,54 @@ def create_openai_embeddings(
         sort_keys=True, ensure_ascii=False,
     )
     return LangChainEmbeddingsAdapter(client, identity)
+
+
+def configure_key_file(path: Path | None) -> None:
+    """명시된 로컬 키를 프로세스에서만 사용한다. 파일/키 내용을 출력하지 않는다."""
+    if path is None:
+        return
+    text = path.read_text(encoding="utf-8-sig")
+    keys = set(re.findall(r"(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{20,}", text))
+    if len(keys) != 1:
+        raise ValueError("키 파일에는 구분 가능한 OpenAI 키 한 개가 필요합니다.")
+    os.environ["OPENAI_API_KEY"] = keys.pop()
+    # 키 파일 방식은 OpenAI 공식 임베딩 실행용이다. 별도 프록시로 보내지 않는다.
+    os.environ["OPENAI_BASE_URL"] = "https://api.openai.com/v1"
+    os.environ["OPENAI_API_BASE"] = "https://api.openai.com/v1"
+    os.environ.pop("OPENAI_LOG", None)
+
+
+class BoundedEmbeddings:
+    """청크를 토큰 한도 안에서만 전송한다. SDK의 자동 분할/평균을 사용하지 않는다."""
+
+    def __init__(self, provider, *, max_tokens: int = 8191):
+        import tiktoken
+
+        self.provider = provider
+        self.identity = provider.identity
+        self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.max_tokens = max_tokens
+
+    def counts(self, texts: list[str]) -> list[int]:
+        counts = [len(self.encoding.encode(text, disallowed_special=())) for text in texts]
+        if any(count > self.max_tokens or count == 0 for count in counts):
+            raise ValueError("빈 입력 또는 임베딩 토큰 한도를 넘는 청크가 있습니다. 청킹을 조정하세요.")
+        return counts
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        counts = self.counts(texts)
+        result = []
+        batch, tokens = [], 0
+        for text, count in zip(texts, counts, strict=True):
+            if batch and (len(batch) >= 64 or tokens + count > 100_000):
+                result.extend(self.provider.embed_documents(batch))
+                batch, tokens = [], 0
+            batch.append(text)
+            tokens += count
+        if batch:
+            result.extend(self.provider.embed_documents(batch))
+        return result
+
+    def embed_query(self, text: str) -> list[float]:
+        self.counts([text])
+        return self.provider.embed_query(text)

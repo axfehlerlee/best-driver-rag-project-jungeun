@@ -5,8 +5,9 @@ import json
 import math
 from pathlib import Path
 
-from scripts.prepare_data import BoundedEmbeddings, configure_key_file
-from src.infrastructure.embeddings import create_openai_embeddings
+from src.infrastructure.embeddings import (
+    BoundedEmbeddings, configure_key_file, create_openai_embeddings,
+)
 from src.infrastructure.stores import load_index, validate_vector
 
 

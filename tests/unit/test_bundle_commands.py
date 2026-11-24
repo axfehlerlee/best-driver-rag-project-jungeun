@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.prepare_data import BoundedEmbeddings, prepare
+from scripts.prepare_data import prepare
 from scripts.search_index import rank_entries
 from src.contracts import Chunk
-from src.infrastructure.embeddings import DemoHashEmbeddings
+from src.infrastructure.embeddings import BoundedEmbeddings, DemoHashEmbeddings
 from src.ingestion.indexing import build_index
 
 
