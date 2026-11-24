@@ -104,3 +104,60 @@ def test_resolve_request_does_not_override_selected_district():
     assert result.status == "needs_clarification"
     assert "송파구" in result.clarification_question
     assert "서대문구" in result.clarification_question
+
+
+# ---------------------------------------------------------------------------
+# PR 리뷰 반영: 질문 속 구 이름, 화면에서 따로 받은 동(request.dong)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_request_uses_district_named_in_question():
+    # "송파구 페트병" → resolved, 송파구. 구를 이미 말했으니 다시 묻지 않는다.
+    result = resolve_request(PipelineRequest(question="송파구 페트병 언제 버려요?"))
+
+    assert result.status == "resolved"
+    assert result.region_status == "no_dong"
+    assert result.district == "송파구"
+    assert result.dong is None
+
+
+def test_resolve_request_tells_unsupported_district_named_in_question():
+    # "강남구 페트병" → 지원 범위 밖. 다른 구 자료로 답하지 않고 안내한다.
+    result = resolve_request(PipelineRequest(question="강남구 페트병 언제 버려요?"))
+
+    assert result.status == "needs_clarification"
+    assert result.region_status == "unsupported"
+    assert "강남구" in result.clarification_question
+
+
+def test_resolve_request_asks_when_named_district_differs_from_selected():
+    # 질문은 송파구, 화면은 서대문구 → 충돌. 어느 쪽으로도 확정하지 않는다.
+    request = PipelineRequest(question="송파구 페트병 언제 버려요?", district="서대문구")
+    result = resolve_request(request)
+
+    assert result.status == "needs_clarification"
+    assert "송파구" in result.clarification_question
+    assert "서대문구" in result.clarification_question
+
+
+def test_resolve_request_resolves_structured_dong_input():
+    # 질문에 동이 없어도 화면에서 받은 동(연희동)을 매핑표로 해석한다.
+    request = PipelineRequest(question="페트병 언제 버려요?", dong="연희동")
+    result = resolve_request(request)
+
+    assert result.status == "resolved"
+    assert result.region_status == "ok"
+    assert result.district == "서대문구"
+    assert result.dong == "연희동"
+
+
+def test_resolve_request_checks_structured_dong_against_selected_district():
+    # 화면에서 송파구 + 연희동(서대문구) → 맞지 않는 짝. 검색하지 않고 되묻는다.
+    request = PipelineRequest(
+        question="페트병 언제 버려요?", district="송파구", dong="연희동"
+    )
+    result = resolve_request(request)
+
+    assert result.status == "needs_clarification"
+    assert "송파구" in result.clarification_question
+    assert "서대문구" in result.clarification_question
