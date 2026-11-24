@@ -4,10 +4,11 @@
 
 ## 초기 구조의 검사 범위
 
-현재는 폴더 구조를 준비한 단계다. 앱 코드와 기능 테스트, 실제 RAG 실행 결과는 아직 없다. [커버리지 워크플로](../.github/workflows/coverage.yml)는 항상 `uv sync --locked`로 기존 Python 환경을 확인한다.
+현재는 폴더와 Python 파일 뼈대를 준비한 단계다. 기능 구현과 기능 테스트, 실제 RAG 실행 결과는 아직 없다. [커버리지 워크플로](../.github/workflows/coverage.yml)는 항상 `uv sync --locked`로 기존 Python 환경을 확인한다.
 
-- `src/` 아래 Python 파일과 루트 `app.py`가 모두 없으면 테스트와 커버리지를 실행하지 않고, GitHub Actions 요약에 미구현 상태를 기록한다.
-- 둘 중 하나에 Python 코드가 생기면 `tests/`의 pytest를 실행한다. 코드만 추가하고 수집할 테스트가 없으면 pytest의 실패를 그대로 드러낸다.
+- `src/`, `scripts/` 또는 `app.py`에 Python 파일이 있으면 `compileall`로 문법을 검사한다.
+- `tests/`에 `test_*.py` 또는 `*_test.py` 파일이 있으면 pytest와 커버리지를 실행한다. 테스트 파일이 없으면 Actions 요약에 기능 테스트와 커버리지를 실행하지 않았다고 기록한다.
+- 테스트 파일은 있지만 수집에 실패하거나 테스트가 실패하면 pytest 오류를 그대로 드러낸다. 뼈대의 문법 검사 성공을 기능 검증 통과로 취급하지 않는다.
 - Streamlit 화면도 Python 검사 범위에 포함한다. Node 설치와 Next.js 테스트 작업은 사용하지 않는다.
 
 기존 검사 이름을 이어가기 위해 워크플로의 job ID `backend`는 유지한다. 이 이름이 별도 HTTP 백엔드를 요구한다는 의미는 아니다.
