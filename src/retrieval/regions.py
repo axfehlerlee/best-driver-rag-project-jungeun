@@ -4,6 +4,7 @@
 상태: 연습용 매핑표로 질문 속 동 이름을 자치구로 해석한다.
 실제 행정동·법정동 매핑표와 공용 반환 규격은 사용하는 담당자와 합의한 뒤 교체한다.
 """
+from src.contracts import PipelineRequest, ResolvedQuery
 
 # 동 이름 → 그 동이 있는 구 목록 (연습용. 실제 행정동·법정동 매핑표로 교체 예정)
 DONG_TO_DISTRICTS: dict[str, list[str]] = {
@@ -56,3 +57,94 @@ def resolve_region(question: str) -> dict:
         return {"status": "unsupported", "district": district, "dong": dong}
 
     return {"status": "ok", "district": district, "dong": dong}
+
+
+def resolve_request(request: PipelineRequest) -> ResolvedQuery:
+    """파이프라인 resolver 콜백. 질문 속 동과 사용자가 고른 구로 검색 지역을 정한다.
+
+    resolve_region()의 팀 내부 4상태를 파이프라인 규격(ResolvedQuery)으로 옮긴다.
+    - status: 파이프라인 분기용. resolved면 검색, needs_clarification이면
+      clarification_question을 사용자에게 그대로 보내고 검색을 건너뛴다.
+    - region_status: 왜 그렇게 판단했는지 (ok / ambiguous / unsupported / no_dong).
+
+    검사 순서: ambiguous → unsupported → no_dong → 고른 구와 충돌 → ok.
+    질문 다듬기는 다른 단계 담당이므로 search_query는 항상 원질문을 쓴다.
+    """
+    region = resolve_region(request.question)
+    selected = request.district  # 사용자가 화면에서 고른 구 (없으면 None)
+
+    # 신사동처럼 여러 구에 있는 동: 하나로 고르지 않고 후보 구를 보여 주며 되묻는다.
+    if region["status"] == "ambiguous":
+        return ResolvedQuery(
+            search_query=request.question,
+            status="needs_clarification",
+            region_status="ambiguous",
+            candidate_districts=region["candidate_districts"],
+            clarification_question=(
+                f"{region['dong']}은 "
+                f"{', '.join(region['candidate_districts'])}에 있어요. "
+                "어느 구인가요?"
+            ),
+        )
+
+    # 역삼동(강남구)처럼 지원 범위 밖: 다른 구 자료로 대신 답하지 않도록
+    # 검색 없이 안내한다.
+    # 임시 결정: 지원하지 않는 구는 "되묻기"로 안내함.
+    # 화면·답변 쪽에서 구 이름을 쓸 수 있게 district도 담는다.
+    if region["status"] == "unsupported":
+        return ResolvedQuery(
+            search_query=request.question,
+            status="needs_clarification",
+            region_status="unsupported",
+            district=region["district"],
+            dong=region["dong"],
+            clarification_question=(
+                f"{region['district']}는 아직 지원하지 않아요. "
+                "서대문구·송파구의 동이나 구를 알려 주세요."
+            ),
+        )
+
+    # 질문에 동이 없을 때: 사용자가 구를 골랐다면 그 구로 검색하고,
+    # 아니면 지역을 되묻는다. 동은 확인하지 못했으므로 추측하지 않고
+    # 요청에 온 값(request.dong)만 쓴다.
+    if region["status"] == "no_dong":
+        if selected is None:
+            return ResolvedQuery(
+                search_query=request.question,
+                status="needs_clarification",
+                region_status="no_dong",
+                clarification_question=(
+                    "어느 지역 기준으로 알려 드릴까요? "
+                    "서대문구·송파구의 동이나 구를 알려 주세요."
+                ),
+            )
+        return ResolvedQuery(
+            search_query=request.question,
+            region_status="no_dong",
+            district=selected,
+            dong=request.dong,
+        )
+
+    # 여기부터는 ok: 질문 속 동이 지원하는 구 하나로 정해진 경우.
+    # 고른 구와 다르면 어느 쪽으로도 덮어쓰지 않고 되묻는다.
+    # (파이프라인은 고른 구와 다른 구를 resolved로 받으면 오류를 낸다.)
+    if selected is not None and selected != region["district"]:
+        return ResolvedQuery(
+            search_query=request.question,
+            status="needs_clarification",
+            region_status="ok",
+            dong=region["dong"],
+            # 사용자가 무엇을 골랐는지도 보여 줘야 어느 쪽인지 답할 수 있다.
+            clarification_question=(
+                f"{selected}를 선택하셨는데 "
+                f"{region['dong']}은 {region['district']}입니다. "
+                "어느 구 기준으로 알려 드릴까요?"
+            ),
+        )
+
+    return ResolvedQuery(
+        search_query=request.question,
+        district=region["district"],
+        dong=region["dong"],
+        region_status="ok",
+    )
