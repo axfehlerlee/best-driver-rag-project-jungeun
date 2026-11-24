@@ -11,6 +11,12 @@ from pydantic import ValidationError
 
 from src.config import load_settings
 from src.contracts import GenerationResult, PipelineRequest, ResolvedQuery
+from src.demo import create_demo_pipeline
+from src.infrastructure.embeddings import DemoHashEmbeddings
+from src.infrastructure.stores import save_index
+from src.ingestion.chunking import chunk_documents
+from src.ingestion.indexing import build_index
+from src.ingestion.loaders import load_source_documents
 from src.runtime import create_runtime
 
 
@@ -47,6 +53,35 @@ def test_demo_cli_produces_three_distinct_outcomes_without_api_key(tmp_path):
     before = (output / "summary.json").read_bytes()
     assert cli("scripts.demo", "--output-dir", str(output), env=env).returncode != 0
     assert (output / "summary.json").read_bytes() == before
+
+
+def test_demo_pipeline_keeps_each_district_conditions_and_citations_separate(tmp_path):
+    settings = load_settings(ROOT / "configs/demo.json", project_root=tmp_path)
+    documents = load_source_documents(ROOT / "tests/fixtures/handoff_documents.json")
+    chunks = chunk_documents(documents, max_characters=settings.max_document_characters)
+    save_index(build_index(chunks, DemoHashEmbeddings(settings.demo_dimensions)), settings.index_path)
+    pipeline = create_demo_pipeline(settings)
+    by_id = {chunk.chunk_id: chunk for chunk in chunks}
+    records = []
+
+    # 대화 CLI를 거치지 않아도 같은 질문의 구별 조건과 근거가 섞이지 않아야 한다.
+    for district, expected, excluded, document_id in (
+        ("서대문구", "조건엑스", "조건와이", "demo-seodaemun"),
+        ("송파구", "조건와이", "조건엑스", "demo-songpa"),
+    ):
+        record = pipeline.run(PipelineRequest(question="품목알파", district=district))
+        records.append(record)
+        assert record.run_kind == "demo"
+        assert record.response.status == "answered", record.response.error
+        assert expected in record.response.answer
+        assert excluded not in record.response.answer
+        assert record.resolved_query.district == district
+        assert {citation.document_id for citation in record.response.citations} == {document_id}
+        assert {citation.chunk_id for citation in record.response.citations} <= set(record.model_input_chunk_ids)
+        assert {by_id[chunk_id].source_document_id for chunk_id in record.model_input_chunk_ids} == {document_id}
+
+    assert len({record.request_id for record in records}) == 2
+    assert len({record.run_id for record in records}) == 2
 
 
 def test_index_then_evaluate_cli_with_default_index_dimensions(tmp_path):
