@@ -23,3 +23,7 @@ jobs:
         # 린트가 실패해도 포맷 결과를 함께 보도록 앞 단계 결과와 무관하게 실행한다.
         if: ${{ !cancelled() }}
         run: uv run --locked ruff format --check --diff src scripts tests app.py
+      - name: Mypy type check
+        # 검사 범위는 pyproject.toml의 [tool.mypy] files에서 관리한다.
+        if: ${{ !cancelled() }}
+        run: uv run --locked mypy
