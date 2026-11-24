@@ -19,7 +19,7 @@
 │  ├─ interface/             Streamlit 화면, 지도와 관찰 패널
 │  ├─ evaluation/            공통 실행기, 담당별 지표와 비교 분석
 │  └─ observability/         실행 원본 기록과 Langfuse 연결
-├─ scripts/                  합성 데모, 질문 입력, 색인과 평가 명령, 수집 진입점
+├─ scripts/                  합성 자동 데모, 자료 준비/근거 조회, 색인과 평가 명령, 수집 진입점
 ├─ data/
 │  ├─ raw/                   수집 원문과 장소 원자료
 │  ├─ processed/             정제 문서, 청크와 장소 자료
@@ -33,7 +33,7 @@
 └─ docs/                     팀 공통 기준과 재현 문서
 ```
 
-Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring만 있는 뼈대다. Streamlit은 현재 공용 의존성에 포함되지 않았고 확인한 프로젝트 가상환경에도 설치되지 않았다. 화면 구현 시 의존성과 잠금 파일을 갱신하고, 구현된 공통 파이프라인을 호출하도록 연결한다. 현재 질문 입력 진입점은 별도의 합성 데모 CLI `scripts/chat.py`이며 Streamlit 화면 구현을 대신하지 않는다. Python 패키지에는 `__init__.py`를 두었다.
+Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring만 있는 뼈대다. Streamlit은 현재 공용 의존성에 포함되지 않았고 확인한 프로젝트 가상환경에도 설치되지 않았다. 화면 구현 시 의존성과 잠금 파일을 갱신하고, 구현된 공통 파이프라인을 호출하도록 연결한다. 현재 질문 입력은 `scripts/search_index.py`의 실제 근거 조회에서 지원하며 답변 생성과 Streamlit 화면은 연결하지 않았다. Python 패키지에는 `__init__.py`를 두었다.
 
 ## 담당 경로
 
@@ -99,18 +99,21 @@ Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring�
 | `src/runtime.py` | 호출자가 준비한 팀 콜백과 기록기 연결, 실제 DB/모델 자동 생성 없음 |
 | `src/pipeline.py` | 콜백 호출 순서, 생성 입력 선택, 인용 확인과 상태/오류 기록 |
 | `src/ingestion/loaders.py` | 출처 목록과 본문을 갖춘 공용 문서 파일을 별도 로딩 |
+| `src/ingestion/bundle_archive.py`, `preprocessed_bundle.py`, `xml_adapter.py` | 제공된 v2 묶음 검증, XML→HTML 변환과 같은 원문의 HTML/JSON 문서 쌍 연결 |
 | `src/ingestion/chunking.py` | 문서 전체를 한 청크로 보존, 문자 수 초과 시 오류 |
+| `src/ingestion/preprocessed_chunking.py` | v2 조문/부칙과 표 행 청킹, 머리글/병합 셀/비고 연결 |
 | `src/ingestion/indexing.py` | 전달된 전체 청크의 새 색인 생성과 메모리 임베딩 캐시 |
-| `src/infrastructure/embeddings.py` | 교체 가능한 provider, 데모 해시 벡터, LangChain/OpenAI 어댑터 |
+| `src/infrastructure/embeddings.py` | 교체 가능한 provider, 데모 해시 벡터, LangChain/OpenAI 어댑터, 입력 한도 검사와 명시적 키 파일 설정 |
 | `src/infrastructure/stores.py` | 로컬 JSON 색인의 검증/저장/읽기, 실제 DB 연결 없음 |
 | `src/evaluation/runner.py` | 명시한 문항을 구성별로 실행하고 결과 반환, 자동 품질 지표 없음 |
 | `src/observability/records.py` | 요청별 원본 JSON을 새 실행 ID로 보존, Langfuse 연결 없음 |
 | `src/demo.py` | 합성 자료용 해시 검색, 명시된 구 확인과 본문 인용 생성기 |
-| `scripts/demo.py`, `scripts/chat.py` | 합성 일괄 실행과 터미널 질문 입력 |
+| `scripts/demo.py` | 외부 API 없이 합성 자료의 상태별 응답을 자동 확인 |
+| `scripts/prepare_data.py`, `scripts/search_index.py` | 전처리 묶음 준비/실제 색인 생성과 지역을 제한한 근거 조회 |
 | `scripts/index.py` | 명시한 공용 문서의 색인 생성, HTML/JSON 형식 선택 |
 | `scripts/evaluate.py` | 데모 또는 팀 연결 함수로 평가 실행, 결과 파일 저장 |
 
-구조를 해석한 품목별 청킹, 실제 문서 수집/추출, 팀의 A/B/C 검색, 질문 변환 모델, 동 이름 추론, 답변 LLM, 장소 DB와 지도는 연결되지 않았다. 데모의 해시 검색과 본문 인용은 공통 흐름 확인용이며 실제 RAG 품질을 입증하지 않는다. 단위/통합 테스트와 CLI 실행 검증 결과는 [최소 구현 인계](seokho-handoff.md#구현-경계와-검증)에 기록한다.
+원문 수집과 HWP 전처리는 PR 8 담당 범위이며 공통 기반은 제공된 산출물을 사용한다. 실제 구조 청킹과 임베딩 색인, 근거 조회는 연결됐지만 팀 A/B/C 검색, 질문 변환 모델, 동 이름 추론, 답변 LLM, 장소 DB와 지도는 연결되지 않았다. 데모의 해시 검색과 본문 인용은 공통 흐름 확인용이며 실제 RAG 품질을 입증하지 않는다. 단위/통합 테스트와 CLI 실행 검증 결과는 [최소 구현 인계](seokho-handoff.md#구현-경계와-검증)에 기록한다.
 
 초기 파일별 구현 항목과 플로우 차트는 [Notion 구조 문서](https://app.notion.com/p/422dc8b0e1638150b62acfe703074f30?pvs=204)에 있다. 현재 구현된 규격과 동작은 저장소 코드와 최소 구현 인계 문서를 기준으로 확인한다.
 

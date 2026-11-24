@@ -91,7 +91,7 @@ except OSError as error:
 
 `load_source_manifest`의 완료 범위는 문서 목록과 첨부 관계 읽기다. 이 함수는 `SourceDocument`나 `Chunk`를 만들지 않으며 ID/버전 발급, 다운로드와 HWP/PDF 추출을 수행하지 않는다.
 
-같은 모듈에는 공용 문서 목록을 읽는 `load_source_documents`와 전처리 파일에 명시적인 메타데이터를 연결하는 `load_preprocessed_content`도 구현돼 있다. 이후 청킹, 색인과 질문 실행은 각각 별도 함수가 담당한다. 제공된 검수 ZIP의 개별 JSON을 자동 변환하거나 목록의 URL을 따라 본문을 가져오는 기능은 아직 없다.
+같은 모듈에는 공용 문서 목록을 읽는 `load_source_documents`와 전처리 파일에 명시적인 메타데이터를 연결하는 `load_preprocessed_content`도 구현돼 있다. 제공된 v2 전처리 묶음은 별도 `src/ingestion/preprocessed_bundle.py`의 `load_preprocessed_bundle`로 읽고, `scripts.prepare_data`에서 ZIP 검증과 구조 청킹, 선택적 실제 색인까지 연결한다. 입력 형식과 실행 방법은 [실제 전처리 자료 연결](seokho-handoff.md#실제-전처리-자료-연결)에 정리한다. 출처 목록의 URL을 따라 원문을 재수집하는 기능은 이 로더의 범위에 포함하지 않는다.
 
 ## 검증
 

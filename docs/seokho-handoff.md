@@ -26,6 +26,8 @@ uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_revi
 
 위 명령은 외부 API 없이 준비한다. 실제 색인까지 만들 때는 `OPENAI_API_KEY` 환경변수를 설정한 프로세스에서 다음 명령을 사용한다. `.env` 파일은 자동으로 읽지 않는다. 기존 로컬 키 파일을 사용하려면 `--api-key-file "C:/비공개/openai-key.txt"`처럼 명시적으로 추가한다. 키 내용은 출력하거나 결과 JSON에 기록하지 않는다.
 
+`scripts.prepare_data`와 `scripts.search_index`는 `src/infrastructure/embeddings.py`의 `configure_key_file`과 `BoundedEmbeddings`를 함께 사용한다. 명시한 키 파일은 현재 프로세스에만 적용하며, 임베딩 입력은 토큰 한도를 확인해 자동 잘림이나 평균 없이 전송한다.
+
 ```powershell
 uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_review_2026-11-24_v2.zip" --version v1 --output-dir data/processed/p04-v2-openai-small --openai-model text-embedding-3-small
 ```
@@ -71,16 +73,6 @@ uv run --locked python -m scripts.evaluate --cases tests/fixtures/handoff_eval.j
 평가 명령은 앞서 만든 색인을 읽으며 자동으로 다시 만들지 않는다. 평가 출력 폴더도 아직 없어야 하고, `evaluation.json`과 `runs/<run_id>.json`이 생성된다. 위 색인 명령은 128차원을 명시했으며, 데모 질의 임베더는 설정값 대신 실제 색인 메타데이터의 차원으로 생성하고 provider identity를 확인한다.
 
 HTML/JSON 비교용 입력은 `scripts.index --content-format html` 또는 `--content-format json`으로 서로 다른 색인 파일에 저장할 수 있다. 형식별 분리만으로 동등한 내용이나 성능 비교가 검증되는 것은 아니다.
-
-## 직접 질문 입력
-
-```powershell
-uv run --locked python -m scripts.chat --demo
-```
-
-구를 입력한 뒤 질문을 계속 입력한다. `품목알파`는 구별 합성 안내를 반환하고, `공통시험품목`은 공통 합성 문서를 사용한다. `없는품목오메가`는 근거 부족을 확인하는 예시다. `/구 송파구` 또는 `/구`로 지역을 변경하고 `/종료`로 종료한다. 빈 질문은 건너뛰며 Ctrl+C와 입력 종료도 지원한다.
-
-각 질문은 독립 처리하므로 이전 질문이나 추가 확인 답변을 이어서 해석하지 않는다. 이 `scripts.chat --demo` 경로에는 실제 분리배출 규칙과 LLM이 연결되어 있지 않다. 색인은 합성 문서로 자동 준비하며 원본 기록은 실행마다 새로운 `results/local/chat-demo-<실행 식별자>/runs/`에 남긴다. 터미널에서는 HTML 태그를 읽기 쉬운 문자열로 표시하고 기록에는 원본 응답을 보존한다. `--output-dir`를 직접 지정하면 아직 존재하지 않는 폴더여야 한다.
 
 ## 자료를 교체하는 방법
 
@@ -218,7 +210,7 @@ print(response.status, response.answer)
 | `index_path` | 사용할 로컬 색인 파일 |
 | `runs_path` | 실행 원본 JSON을 저장할 폴더 |
 | `max_document_characters` | 문서 전체 청킹의 문자 수 한도 |
-| `demo_dimensions` | `scripts.demo`와 `scripts.chat`이 새 색인을 만들 때 사용할 데모 임베딩 차원 |
+| `demo_dimensions` | `scripts.demo`가 새 색인을 만들 때 사용할 데모 임베딩 차원 |
 | `pipeline` | 검색 변형, 질의 변환 사용, top-k, 생성 입력 문자 한도와 실행 버전 |
 
 `create_runtime`은 콜백과 기록기를 연결하며 자동으로 실제 DB나 모델을 생성하지 않는다. `RunRecorder`는 실행마다 `<run_id>.json`을 생성하고 같은 실행 ID 파일을 덮어쓰지 않는다. 기록에는 원질문, 해석된 지역과 질의(`resolved_query`), 실제 검색 질의, 후보, 생성 입력 ID, 답변/인용, 단계별 상태와 시간이 들어간다. `RunRecord.duration_ms`는 기록 파일 저장 전까지의 파이프라인 시간이다. 토큰 사용량, API 비용과 Langfuse trace는 현재 자동 수집하지 않는다.
@@ -240,14 +232,13 @@ print(response.status, response.answer)
 | `src/ingestion/bundle_archive.py`, `preprocessed_bundle.py`, `xml_adapter.py` | v2 묶음 검증과 XML→HTML/JSON 문서 쌍 생성 | 새 전처리 규격, 개정본 ID 연결과 추가 검수 범위 |
 | `src/ingestion/chunking.py`, `preprocessed_chunking.py` | 일반 문서 전체 청크와 v2 조문/표 행 청크 | 품질 검증에 따른 분할 개선 |
 | `src/ingestion/indexing.py` | provider 기반 색인 스냅샷 생성과 메모리 캐시 | 실제 임베딩 provider와 갱신 정책 |
-| `src/infrastructure/embeddings.py` | provider 경계, 데모 해시 임베딩, LangChain 연결 | 사용할 모델과 설정 |
+| `src/infrastructure/embeddings.py` | provider 경계, 데모 해시 임베딩, LangChain 연결, 입력 한도 검사와 명시적 키 파일 설정 | 사용할 모델과 설정 |
 | `src/infrastructure/stores.py` | 검증 가능한 로컬 JSON 색인 저장/읽기 | 실제 DB/벡터 저장소 |
 | `src/pipeline.py` | 주입받은 팀 함수를 연결하는 공통 호출 흐름 | 지역 해석, 질문 변환, 검색, 답변 생성과 장소 조회 |
 | `src/observability/records.py` | 실행 원본 기록 | 운영 저장 위치와 보존 정책, Langfuse 연결 |
 | `src/evaluation/runner.py` | 같은 공통 흐름으로 평가 사례 실행 | Ragas, Hit@5, 사람 채점과 최종 비교 |
 | `src/config.py`, `src/runtime.py` | 설정 읽기와 함수 연결 | 실제 서비스의 설정 및 자원 생성 |
 | `src/demo.py`, `scripts/demo.py` | 외부 API 없는 합성 흐름 확인 | 실제 서비스 성능 평가로 대체하지 않음 |
-| `scripts/chat.py` | 구 선택과 반복 질문 입력, 출처 표시 | 합성 자료 전용이며 대화 기억과 실제 지역 추론 없음 |
 | `scripts/index.py`, `scripts/evaluate.py` | 명시적인 입력/출력 파일을 받는 CLI | 실제 자료와 검증용 사례 경로 |
 | `scripts/prepare_data.py`, `scripts/search_index.py` | v2 자료 준비/실제 색인과 지역 제한 근거 조회 | 팀 검색/생성 파이프라인 연결, 검색 품질 개선 |
 
@@ -257,15 +248,15 @@ print(response.status, response.answer)
 
 2026-11-24, Python 3.13.14 환경에서 확인한 결과는 다음과 같다. 테스트 명령과 CI 설정은 [검사와 의존성 관리](CI-AND-DEPENDENCIES.md)를 따른다.
 
-- 전체 테스트 272개와 커버리지 XML 생성, `src`, `scripts`, `app.py`의 문법 검사, 잠금 파일 및 설치 의존성 호환성 검사를 통과했다. 이 테스트는 아래에 명시한 실제 자료/API 확인과 별도이며 공용 계약의 미구현 부분을 완료로 바꾸지 않는다.
-- 별도의 새 Python 3.13.14 가상환경에서도 `uv sync --locked`로 111개 패키지를 설치하고 전체 테스트 272개를 통과했다. 다른 운영체제나 사용자 PC에서의 재현을 확인한 결과는 아니다.
+- 합성 대화 CLI 제거 후 전체 테스트 270개와 커버리지 XML 생성, `src`, `scripts`, `app.py`의 문법 검사를 통과했다. 이 테스트는 아래에 명시한 실제 자료/API 확인과 별도이며 공용 계약의 미구현 부분을 완료로 바꾸지 않는다.
+- 별도로 준비한 깨끗한 Python 3.13 의존성 환경에서도 전체 테스트 270개와 `scripts.prepare_data`, `scripts.search_index`의 `--help` 실행을 통과했다. 다른 운영체제나 사용자 PC에서의 재현을 확인한 결과는 아니다.
+- 실제 v2 입력을 외부 임베딩 요청 없이 다시 처리해 `report.json`의 `completed`/`not_requested` 상태를 확인했다. HTML 557개와 JSON 557개 청크 배열은 기존 실제 색인의 청크 배열과 완전히 같았다.
 
 - XML 어댑터 단위 검사와 실제 v2 파일 23개 대조에서 본문 121단위/부칙 4구획, 표 32개/셀 2,643개의 원문 텍스트, 좌표와 병합 보존을 확인했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
 - 실제 `text-embedding-3-small` 호출로 HTML/JSON 각각 557개 청크, 1,536차원 색인을 완성했다. 로컬 입력 토큰 계수는 HTML 498,212개(청크 최대 2,145개), JSON 408,678개(최대 2,007개)다. 이는 전송할 문자열의 로컬 계수이며 제공자 사용량/청구 내역이 아니다.
 - 실제 근거 조회 3개 질문을 두 색인에 실행했다. 송파구 일반주택 음식물 배출시간의 같은 근거는 HTML 1위와 JSON 2위에 나타났다. 우유팩 전용 수거함 부재와 페트병 라벨 질문은 양쪽 상위 3개에서 해당 품목별 별표가 빠졌다. 검색 동작 확인이며 품질 우열이나 정확도 평가 결과로 해석하지 않는다.
 - 실제 데모 CLI에서 출처 목록 4건과 첨부 21건을 읽고, 합성 문서 3개의 청크와 실행 JSON 3개를 생성했다. 결과는 `answered`, `needs_clarification`, `insufficient_evidence`로 구분됐다.
 - 색인 CLI의 기본 64차원 결과를 평가 CLI가 읽는 흐름, 연결 함수 오류의 기록과 종료 코드 1, 재실행 시 기존 결과를 덮어쓰지 않는 동작을 통합 테스트로 확인했다.
-- 직접 질문 CLI에서는 구 변경에 따른 답변/출처, 근거 부족, 지역 재질문, 빈 입력과 종료, 원본 기록 보존을 확인했다.
 
 실제 임베딩 API와 로컬 근거 조회까지 검증했다. DB, 팀 A/B/C 검색, 답변 LLM, 지도/UI와 최종 품질 평가는 연결 전이며 bge-m3 비교도 미실행이다. 합성 데모와 실제 색인 성공을 분리배출 답변 정확도나 최종 HTML/JSON 품질 비교 완료로 해석하지 않는다.
 

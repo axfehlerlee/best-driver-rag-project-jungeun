@@ -4,7 +4,7 @@
 
 ## 현재 구현과 검사 범위
 
-공통 문서 로딩, 문서 전체 청킹, 로컬 색인, 콜백 기반 파이프라인, 실행 기록과 평가 실행기가 구현되어 있다. 합성 데모와 직접 질문 CLI도 실행할 수 있다. `app.py`의 Streamlit 화면은 아직 파일 뼈대이며, 실제 팀 A/B/C 검색, 답변 모델, 장소 DB와 품질평가 연동은 별도 작업이다. 현재 제공하는 API와 연결 방법은 [공통 기반 최소 인계본](seokho-handoff.md)에 정리한다.
+공통 문서 로딩과 제공된 전처리 묶음 연결, 문서 전체 및 조문/표 행 청킹, 로컬 색인, 콜백 기반 파이프라인, 실행 기록과 평가 실행기가 구현되어 있다. 합성 자동 데모와 실제 임베딩 색인의 근거 조회 CLI도 실행할 수 있다. `app.py`의 Streamlit 화면은 아직 파일 뼈대이며, 실제 팀 A/B/C 검색, 답변 모델, 장소 DB와 품질평가 연동은 별도 작업이다. 현재 제공하는 API와 연결 방법은 [공통 기반 최소 인계본](seokho-handoff.md)에 정리한다.
 
 [커버리지 워크플로](../.github/workflows/coverage.yml)는 Ubuntu에서 `.python-version`의 Python을 준비하고 uv `0.13.9`를 설치한 뒤 `uv sync --locked`로 잠금 파일에 맞춰 의존성을 설치한다.
 
@@ -27,7 +27,7 @@ uv run --locked python -m pytest tests --cov --cov-config=.coveragerc --cov-repo
 
 [커버리지 설정](../.coveragerc)은 분기 커버리지와 상대 파일 경로를 사용한다. 보고서에는 `src/`와 `app.py`를 포함하고 `tests/`를 제외한다. `scripts/`는 문법 검사와 CLI 테스트 대상이지만 현재 커버리지 보고 대상에는 포함되지 않는다. 결과 파일은 루트 `coverage.xml`이다.
 
-검증용 표본은 `tests/fixtures/`, 단위 테스트는 `tests/unit/`, 연결 테스트는 `tests/integration/`에 있다. 직접 질문 CLI의 검사도 `tests/integration/test_chat_cli.py`에 있으므로 위의 공통 pytest 명령으로 함께 실행한다. `.coveragerc`에는 커버리지 하한을 지정하지 않았다.
+검증용 표본은 `tests/fixtures/`, 단위 테스트는 `tests/unit/`, 연결 테스트는 `tests/integration/`에 있다. 위의 공통 pytest 명령으로 함께 실행한다. `.coveragerc`에는 커버리지 하한을 지정하지 않았다.
 
 로컬 테스트 수와 합성 데모/CLI에서 확인한 동작은 [인계본 검증 기록](seokho-handoff.md#구현-경계와-검증)에 모은다. 해당 결과는 GitHub Actions 실행 성공이나 Codecov 업로드 성공을 뜻하지 않는다.
 
