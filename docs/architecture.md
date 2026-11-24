@@ -22,6 +22,7 @@
 ├─ scripts/                  합성 자동 데모, 자료 준비/근거 조회, 색인과 평가 명령, 수집 진입점
 ├─ data/
 │  ├─ raw/                   수집 원문과 장소 원자료
+│  ├─ handoff/               검토 후 Git에 포함한 실제 전처리 인계 자료
 │  ├─ processed/             정제 문서, 청크와 장소 자료
 │  └─ indexes/               재생성 가능한 색인
 ├─ eval/                     개발셋과 최종셋, 정답과 허용 근거
@@ -49,18 +50,25 @@ Streamlit 진입점인 루트 `app.py`와 `src/interface/`는 아직 docstring�
 
 ## 파일별 구현 상태
 
-수집/질문 정제, 검색/지역/장소, 답변 생성, 화면/관찰 검증 표의 파일은 현재 역할을 표시한 시작 뼈대다. 공통 기반 표에는 이미 구현한 범위를 적었다. 타입은 `src/contracts.py`, 실제 함수 시그니처와 실행 방법은 [최소 구현 인계](seokho-handoff.md)를 기준으로 한다. 담당자는 내부 파일을 확장할 수 있으며 공용 호출 경계 변경은 사용하는 담당자와 맞춘다.
+수집/전처리와 공통 기반은 아래에 구현된 범위를 적었다. 질문 정제, 검색/지역/장소, 답변 생성과 화면/관찰 검증에는 아직 역할만 표시한 뼈대가 남아 있다. 타입은 `src/contracts.py`, 실제 함수 시그니처와 실행 방법은 [인계 문서](seokho-handoff.md)를 기준으로 한다. 담당자는 내부 파일을 확장할 수 있으며 공용 호출 경계 변경은 사용하는 담당자와 맞춘다.
 
-### 데이터 수집과 질문 정제 (이정은, 구현 예정)
+### 데이터 수집과 질문 정제 (이정은)
 
-| 파일 | 역할 |
+수집/전처리는 [PR 8](https://github.com/kssk3/best-driver-rag-project/pull/8)에서 구현돼 현재 `dev`에 포함됐다. `data/handoff/jungeun/p04-2026-11-24/`의 원본과 전처리 산출물은 공통 로더에 연결했다. 다음 표의 구현 여부는 수집/전처리 코드와 질의 시점 기능을 구분한다.
+
+| 파일 | 구현 상태와 역할 |
 | --- | --- |
-| `src/ingestion/collect.py` | 공식 문서 수집 |
-| `src/ingestion/clean.py` | 본문과 조건 정제 |
-| `src/ingestion/spots.py` | getSpot 원자료 수집 |
-| `src/query/aliases.py` | 품목과 표현 별칭 |
-| `src/query/rewrite.py` | 질문 다듬기 |
-| `scripts/collect.py` | 수집 실행 진입점 |
+| `src/ingestion/collect.py` | 구현: 설정한 자치법규 본문과 첨부 목록 수집 |
+| `src/ingestion/clean.py` | 구현: 본문 조문, 부칙과 제개정이유를 나눈 검토용 JSON 추출 |
+| `src/ingestion/annexes.py` | 구현: 공식 첨부 HWP 수집, XML/표 셀/문단 추출과 검수 보정 반영 |
+| `src/ingestion/search_preparation.py` | 구현: 병합 셀을 반영한 행 표현과 변경 이력을 남기는 제한적 용어 정규화 |
+| `src/ingestion/source_review.py` | 구현: 수집 전 사람이 기록한 접근/이용조건 확인 |
+| `scripts/collect.py` | 구현: 수집 실행 진입점 |
+| `src/ingestion/spots.py` | 뼈대: getSpot 원자료 수집 |
+| `src/query/aliases.py` | 뼈대: 품목과 표현 별칭 |
+| `src/query/rewrite.py` | 뼈대: 질문 다듬기 |
+
+공통 청커는 전처리 JSON의 원문 `text`를 사용하며 `search_text` 정규화는 아직 검색 입력에 적용하지 않는다. 새 HWP를 다시 추출하려면 `annexes.py`가 사용하는 별도 `hwp5proc` 환경이 필요하지만, 저장소 인계 자료를 읽는 준비/색인 명령에는 필요하지 않다.
 
 ### 검색과 지역 및 장소 조회 (이명지, 구현 예정)
 

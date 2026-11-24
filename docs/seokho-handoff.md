@@ -2,9 +2,29 @@
 
 이 문서는 양석호 담당 공통 기반을 팀 코드에 연결하는 방법과 현재 구현 범위를 설명한다. PR 8의 실제 전처리 자료로 XML 유래 HTML/JSON 색인을 만들고 근거 조회까지 확인했다. 공통 응답 파이프라인은 합성 데모로 검증했으며 팀 A/B/C 검색과 답변 LLM, UI는 아직 연결하지 않았다. 담당 구분은 [구조와 책임](architecture.md), 팀 연결 규칙은 [공동 입출력](TEAM-SETUP.md)에 둔다.
 
+## 인수인계 요약
+
+공통 계약, 출처/본문 로더, XML→HTML 변환, 조문/표 행 청킹, 형식별 색인, 팀 콜백 연결, 인용 검사, 실행 기록과 평가 실행기를 구현했다. `SourceDocument` 규격은 유지한다. 실제 자료는 HTML/JSON 각각 557개 청크로 색인하고 근거 조회까지 확인했으며, 공통 응답 흐름은 합성 데모의 답변/지역 재질문/근거 부족으로 검증했다. 팀원이 먼저 읽을 내용은 [Notion 인수인계](https://app.notion.com/p/422dc8b0e16381758494e218a97087aa)에도 정리했다.
+
+기본 입력은 저장소에 포함된 `data/handoff/jungeun/p04-2026-11-24/`다. Python 3.13.14와 uv 0.13.9 이상으로 [환경을 준비](#처음-실행하기)한 뒤 [자료 준비 명령](#준비와-실제-색인-명령)을 실행한다. 외부 API 없이 문서/청크 준비와 합성 데모를 실행할 수 있다. 실제 색인 생성과 근거 조회에는 OpenAI 인증과 네트워크가 필요하며, 생성 색인은 Git에 없으므로 새 환경에서 다시 만들어야 한다. 기존 v2 ZIP도 대체 입력으로 지원한다.
+
+담당은 기존 [책임 구분](architecture.md#담당-경로)을 따른다. 아래는 인계받은 코드의 다음 연결 지점이며 새 역할 배정을 뜻하지 않는다.
+
+| 담당자 | 다음 연결 지점 |
+| --- | --- |
+| 이정은 | 구현된 수집/전처리 산출물 유지, 품목 별칭과 질문 다듬기 연결, 원질문/조건 전달 계약 확인 |
+| 이명지 | 지역/동 해석과 A/B/C 검색을 콜백에 연결, 장소 저장/조회와 Hit@5 연결 |
+| 강성수 | 실제 근거 기반 생성 콜백, 응답 정책과 인용, Ragas 및 Langfuse 연결 |
+| 이승주 | Streamlit 화면과 지도, 상태/근거 관찰, 공용 검증과 최종 평가셋 연결 |
+| 양석호 | 공용 규격과 런타임, 재현 가능한 실행/평가 경계의 인계 |
+
+연결 전에 사용하는 담당자와 확정할 계약은 질문 다듬기에 원질문/조건을 전달하는 방식과 실패 복귀 값, 검증/추적 훅, 재생성/재시도의 시도별 기록이다. 현재 한계와 제안은 [공용 규격과 팀 연결](#공용-규격과-팀-연결)에 적었으며 구현된 계약으로 간주하지 않는다. 후속 공용 계약 변경과 전체 통합 담당은 팀에서 정한다.
+
+현재 실제 질문 도구는 근거 조회 CLI이며 챗봇 답변이나 대화 기억을 제공하지 않는다. 질문 범위 판별과 관련성 하한이 없어 `안녕`에도 무관한 검색 결과가 나올 수 있다. 관련 품목의 별표가 상위 결과에 빠진 사례가 있으며, HTML/JSON 검색 우열과 최종 답변 품질은 아직 검증하지 않았다.
+
 ## 실제 전처리 자료 연결
 
-수집과 HWP 전처리의 책임은 [PR 8](https://github.com/kssk3/best-driver-rag-project/pull/8)에 있다. 공통 기반은 제공된 v2 ZIP의 해시와 문서 관계를 확인하고, 이미 만들어진 XML/JSON을 읽는다. 원문을 다시 수집하거나 ZIP 안의 코드를 실행하지 않는다. 확인한 PR head는 `7598fa3`이며 전처리 파일 44개와 원본 파일 23개가 제공된 ZIP과 바이트 단위로 일치했다.
+수집과 HWP 전처리의 책임은 [PR 8](https://github.com/kssk3/best-driver-rag-project/pull/8)에 있다. 현재 기본 입력은 이 PR로 저장소에 포함된 `data/handoff/jungeun/p04-2026-11-24/`이며 별도로 받은 v2 ZIP도 지원한다. 공통 기반은 해시와 문서 관계를 확인하고 이미 만들어진 XML/JSON을 읽는다. 원문을 다시 수집하거나 묶음 안의 코드를 실행하지 않는다. 확인한 PR head는 `7598fa3`이며 전처리 파일 44개와 원본 파일 23개가 제공된 ZIP과 바이트 단위로 일치했다.
 
 `src/ingestion/xml_adapter.py`의 `xml_to_html`은 본문 `LawService` XML의 조문/부칙과 첨부 `HwpDoc` XML의 문단/표/병합셀을 HTML로 변환한다. 작성자/폰트 메타데이터와 제개정이유는 검색 본문에 넣지 않는다. XML의 공백과 문구를 보존하며 DTD/entity 선언과 잘못된 표 좌표는 거부한다. 같은 원문의 전처리 JSON은 문자열을 유지해 읽는다. `SourceDocument`와 `Chunk`의 `html/json` 계약은 유지한다.
 
@@ -18,21 +38,21 @@
 
 ### 준비와 실제 색인 명령
 
-저장소 루트에서 실행한다. 입력 ZIP은 별도로 받아 보관해야 하며 아래 경로는 예시다. `--version v1`은 원문 버전이고 인계 파일명의 `v2`와 다른 값이다. 출력 폴더는 새 경로여야 한다.
+저장소 루트에서 실행한다. 기본 인계 자료는 Git에 포함돼 있으며 별도 다운로드가 필요 없다. `--version v1`은 원문 버전이고 인계 파일명의 `v2`와 다른 값이다. 출력 폴더는 새 경로여야 한다.
 
 ```powershell
-uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_review_2026-11-24_v2.zip" --version v1 --output-dir data/processed/p04-v2-prepared
+uv run --locked python -m scripts.prepare_data --bundle data/handoff/jungeun/p04-2026-11-24 --version v1 --output-dir data/processed/p04-v2-prepared
 ```
 
-위 명령은 외부 API 없이 준비한다. 실제 색인까지 만들 때는 `OPENAI_API_KEY` 환경변수를 설정한 프로세스에서 다음 명령을 사용한다. `.env` 파일은 자동으로 읽지 않는다. 기존 로컬 키 파일을 사용하려면 `--api-key-file "C:/비공개/openai-key.txt"`처럼 명시적으로 추가한다. 키 내용은 출력하거나 결과 JSON에 기록하지 않는다.
+위 명령은 외부 API 없이 준비한다. 별도로 받은 v2 ZIP을 쓰려면 입력만 `--bundle "C:/자료/p04_data_review_2026-11-24_v2.zip"`으로 바꾼다. 실제 색인까지 만들 때는 `OPENAI_API_KEY` 환경변수를 설정한 프로세스에서 다음 명령을 사용한다. `.env` 파일은 자동으로 읽지 않는다. 기존 로컬 키 파일을 사용하려면 `--api-key-file "C:/비공개/openai-key.txt"`처럼 명시적으로 추가한다. 키 내용은 출력하거나 결과 JSON에 기록하지 않는다.
 
 `scripts.prepare_data`와 `scripts.search_index`는 `src/infrastructure/embeddings.py`의 `configure_key_file`과 `BoundedEmbeddings`를 함께 사용한다. 명시한 키 파일은 현재 프로세스에만 적용하며, 임베딩 입력은 토큰 한도를 확인해 자동 잘림이나 평균 없이 전송한다.
 
 ```powershell
-uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_review_2026-11-24_v2.zip" --version v1 --output-dir data/processed/p04-v2-openai-small --openai-model text-embedding-3-small
+uv run --locked python -m scripts.prepare_data --bundle data/handoff/jungeun/p04-2026-11-24 --version v1 --output-dir data/processed/p04-v2-openai-small --openai-model text-embedding-3-small
 ```
 
-생성물은 `documents.json`, `identities.json`, `chunks-html.json`, `chunks-json.json`, `report.json`이며 실제 색인을 요청하면 `index-html.json`과 `index-json.json`도 만든다. ZIP 입력은 필요한 원본과 전처리 자료를 `input/`에 보관한다. 데이터와 생성물, 키 파일은 Git 추적 대상이 아니다. 실패한 실행도 `report.json`에 상태, 단계와 오류 종류를 남기므로 일부 파일의 존재만으로 성공을 판단하지 않는다.
+생성물은 `documents.json`, `identities.json`, `chunks-html.json`, `chunks-json.json`, `report.json`이며 실제 색인을 요청하면 `index-html.json`과 `index-json.json`도 만든다. ZIP 입력은 필요한 원본과 전처리 자료를 `input/`에 보관한다. 검토한 `data/handoff/` 인계 자료는 Git에 포함되지만 새 청크/색인과 실행 결과는 Git 제외 경로에 저장하며 개인 보관 ZIP과 키 파일도 커밋하지 않는다. 실패한 실행도 `report.json`에 상태, 단계와 오류 종류를 남기므로 일부 파일의 존재만으로 성공을 판단하지 않는다.
 
 같은 자료를 다시 처리할 때는 다른 출력 폴더를 사용한다. 수집처 식별자가 바뀐 개정본에도 기존 문서 ID를 유지해야 한다면 이전 `identities.json`의 `source_key`와 ID 연결을 확인해 `--identities`로 제공한다. 원문 버전은 호출자가 명시하며 로더가 개정을 추정하지 않는다.
 
@@ -44,7 +64,7 @@ uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_revi
 uv run --locked python -m scripts.search_index --index data/processed/p04-v2-openai-small/index-html.json --index data/processed/p04-v2-openai-small/index-json.json --district 송파구
 ```
 
-질문을 반복 입력하고 `/종료`로 종료한다. `--question "질문"`으로 한 번만 조회할 수 있고, 이때 `--output results/local/검색기록.json`을 추가하면 전체 근거를 새 파일에 저장한다. 화면에는 청크 본문의 앞부분과 출처를 표시한다. 공백 질문/지역은 실행 전에 거부한다.
+질문을 반복 입력하고 `/종료`로 종료한다. `--question "질문"`으로 한 번만 조회할 수 있고, 이때 `--output results/local/검색기록.json`을 추가하면 전체 근거를 새 파일에 저장한다. 화면에는 청크 본문의 앞부분과 출처를 표시한다. 옵션으로 넘긴 공백 질문/지역은 실행 전에 거부하고 반복 입력 중 빈 질문은 건너뛴다.
 
 이 도구는 같은 질문 벡터로 두 색인을 조회하며 지역이 다른 청크와 지역 미확인 청크를 제외한다. 실제 벡터의 단순 코사인 유사도 확인용으로, 답변 생성이나 팀 A/B/C 검색 구현을 대신하지 않는다. 지역은 `--district`로 지정하고 문장에서 추론하지 않는다.
 
@@ -248,9 +268,9 @@ print(response.status, response.answer)
 
 2026-11-24, Python 3.13.14 환경에서 확인한 결과는 다음과 같다. 테스트 명령과 CI 설정은 [검사와 의존성 관리](CI-AND-DEPENDENCIES.md)를 따른다.
 
-- 합성 대화 CLI 제거 후 전체 테스트 270개와 커버리지 XML 생성, `src`, `scripts`, `app.py`의 문법 검사를 통과했다. 이 테스트는 아래에 명시한 실제 자료/API 확인과 별도이며 공용 계약의 미구현 부분을 완료로 바꾸지 않는다.
-- 별도로 준비한 깨끗한 Python 3.13 의존성 환경에서도 전체 테스트 270개와 `scripts.prepare_data`, `scripts.search_index`의 `--help` 실행을 통과했다. 다른 운영체제나 사용자 PC에서의 재현을 확인한 결과는 아니다.
-- 실제 v2 입력을 외부 임베딩 요청 없이 다시 처리해 `report.json`의 `completed`/`not_requested` 상태를 확인했다. HTML 557개와 JSON 557개 청크 배열은 기존 실제 색인의 청크 배열과 완전히 같았다.
+- 최신 `dev`의 PR 8을 통합한 상태에서 전체 테스트 307개, 커버리지 XML 생성과 `src`, `scripts`, `app.py`의 문법 검사를 통과했다. 로컬 검증 결과이며 원격 CI 통과를 뜻하지 않는다. 이 테스트는 아래에 명시한 실제 자료/API 확인과 별도이며 공용 계약의 미구현 부분을 완료로 바꾸지 않는다.
+- uv 0.13.9의 `uv sync --locked`로 새 Python 3.13.14 의존성 환경을 설치하고 전체 테스트 307개를 통과했다. 같은 새 환경에서 합성 데모의 `answered`, `needs_clarification`, `insufficient_evidence` 세 경로와 `scripts.prepare_data`, `scripts.search_index`의 `--help` 실행을 확인했다. 다른 운영체제나 사용자 PC에서의 재현을 확인한 결과는 아니다.
+- 저장소에 포함된 v2 인계 폴더를 외부 임베딩 요청 없이 다시 처리해 `report.json`의 `completed`/`not_requested` 상태를 확인했다. HTML 557개와 JSON 557개 청크 배열은 기존 실제 색인의 청크 배열과 완전히 같았다.
 
 - XML 어댑터 단위 검사와 실제 v2 파일 23개 대조에서 본문 121단위/부칙 4구획, 표 32개/셀 2,643개의 원문 텍스트, 좌표와 병합 보존을 확인했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
 - 실제 `text-embedding-3-small` 호출로 HTML/JSON 각각 557개 청크, 1,536차원 색인을 완성했다. 로컬 입력 토큰 계수는 HTML 498,212개(청크 최대 2,145개), JSON 408,678개(최대 2,007개)다. 이는 전송할 문자열의 로컬 계수이며 제공자 사용량/청구 내역이 아니다.
