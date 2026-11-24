@@ -43,21 +43,25 @@ uv run --locked python -m pytest tests --cov --cov-config=.coveragerc --cov-repo
 
 ## 린트, 포맷과 타입 검사
 
-[린트 워크플로](../.github/workflows/lint.yml)는 커버리지 워크플로와 같은 조건(PR, `main`·`dev` 푸시)에서 별도 job으로 실행된다. 린트가 실패해도 테스트 결과는 커버리지 워크플로에서 따로 확인할 수 있다. 세 단계는 앞 단계가 실패해도 모두 실행해 한 번에 결과를 보여 준다.
+[린트 워크플로](../.github/workflows/lint.yml)는 커버리지 워크플로와 같은 조건(PR, `main`·`dev` 푸시)에서 별도 job으로 실행된다. 린트가 실패해도 테스트 결과는 커버리지 워크플로에서 따로 확인할 수 있다. 세 단계는 앞 단계가 실패해도 모두 실행해 한 번에 결과를 보여 준다. 단, `uv sync --locked`가 실패하면 뒤 단계는 건너뛴다.
 
-- **Ruff 린트**: `src`, `scripts`, `tests`, `app.py`를 검사한다. 규칙은 `pyproject.toml`의 `[tool.ruff.lint] select`에 명시한 `E4`, `E7`, `E9`, `F`, `I`(문법·이름 오류, 명백한 문장 구조 문제, import 정렬)이며, Ruff 버전이 올라가도 기본 규칙 변화에 영향받지 않는다.
-- **Ruff 포맷 검사**: 같은 범위가 `ruff format` 결과와 같은지 확인한다. 줄 길이는 Ruff 기본값 88열이다. 일괄 포맷 커밋은 [`.git-blame-ignore-revs`](../.git-blame-ignore-revs)에 등록되어 GitHub blame에서 건너뛴다.
-- **mypy 타입 검사**: `pyproject.toml`의 `[tool.mypy] files`에 적은 경로만 검사한다. 현재 범위는 `src/generation`, `src/evaluation/answer_experiments`이며, 다른 경로는 담당자가 타입 오류를 정리한 뒤 목록에 추가한다.
+- **Ruff 린트**: `src`, `scripts`, `tests`, `app.py`를 검사한다. 규칙은 `pyproject.toml`의 `[tool.ruff.lint] select`에 명시한 `E4`, `E7`, `E9`, `F`, `I`(문법·이름 오류, 명백한 문장 구조 문제, import 정렬)이다. Ruff 기본 규칙이 바뀌어도 이 목록은 유지되지만, 같은 접두어에 새 규칙이 추가되거나 포맷 스타일이 바뀔 수 있으므로 Dependabot의 Ruff 버전 갱신 PR에서 Lint 결과를 확인한다.
+- **Ruff 포맷 검사**: 같은 범위가 `ruff format` 결과와 같은지 확인한다. 줄 길이는 Ruff 기본값 88열이다. Ruff는 이 범위 안의 Markdown 파일에 들어 있는 Python 코드 블록도 포맷 대상으로 삼는다. 일괄 포맷 커밋은 [`.git-blame-ignore-revs`](../.git-blame-ignore-revs)에 등록되어 GitHub blame에서 건너뛴다.
+- **mypy 타입 검사**: `pyproject.toml`의 `[tool.mypy] files`에 적은 경로만 검사한다. 현재 범위는 `src/generation`, `src/evaluation/answer_experiments`이며, 다른 경로는 담당자가 타입 오류를 정리한 뒤 목록에 추가한다. 목록 밖 모듈(예: `src/contracts.py`)은 import를 따라가 타입 정보로만 쓰고 오류는 보고하지 않는다(`follow_imports = "silent"`).
 
-저장소 루트에서 CI와 같은 명령을 실행한다. 포맷 위반은 `ruff format`, 자동 수정 가능한 린트 위반은 `ruff check --fix`로 고친다.
+저장소 루트에서 CI와 같은 명령을 실행한다. 전역에 설치한 `ruff`는 잠금 파일과 버전이 다를 수 있으므로 항상 `uv run --locked`로 실행하고, 다른 파일이 바뀌지 않도록 경로를 지정한다.
 
 ```sh
 uv run --locked ruff check src scripts tests app.py
 uv run --locked ruff format --check src scripts tests app.py
 uv run --locked mypy
+
+# 위반 수정 (포맷, 자동 수정 가능한 린트 위반)
+uv run --locked ruff format src scripts tests app.py
+uv run --locked ruff check --fix src scripts tests app.py
 ```
 
-로컬 `git blame`에서 일괄 포맷 커밋을 건너뛰려면 한 번 설정한다.
+GitHub blame은 이 파일을 자동으로 적용한다. 로컬 `git blame`에서도 건너뛰려면 아래처럼 설정한다. 이 설정은 `.git-blame-ignore-revs`가 없는 브랜치(예: 이 변경이 병합되기 전의 `main`)에서 `git blame`을 실패시키므로, 그런 브랜치에서는 `git -c blame.ignoreRevsFile= blame ...`으로 실행한다. 일괄 포맷 커밋의 SHA가 바뀌지 않도록 이 브랜치는 merge commit으로 병합한다.
 
 ```sh
 git config blame.ignoreRevsFile .git-blame-ignore-revs
