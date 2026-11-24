@@ -22,7 +22,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "pytest-cov"]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff>=0.17.6",
+]
 
 [tool.uv]
 package = false
@@ -31,3 +35,12 @@ required-version = ">=0.13.9"
 [[tool.uv.index]]
 url = "https://pypi.org/simple"
 default = true
+
+[tool.ruff]
+# 대상 버전은 requires-python(==3.13.14)에서 자동으로 정해진다.
+src = ["."]
+
+[tool.ruff.lint]
+# Ruff 버전이 올라가도 기본 규칙 변화에 흔들리지 않도록 규칙을 명시한다.
+# 시작은 문법·이름 오류(F, E9)와 명백한 문장 구조 문제(E4, E7)만 검사한다.
+select = ["E4", "E7", "E9", "F"]

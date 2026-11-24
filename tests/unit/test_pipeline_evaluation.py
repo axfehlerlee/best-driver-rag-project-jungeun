@@ -1,7 +1,6 @@
 """합성 콜백으로 호출 경계, 근거 보존과 평가 입력 분리를 검증한다."""
 
 import json
-from pathlib import Path
 
 import pytest
 

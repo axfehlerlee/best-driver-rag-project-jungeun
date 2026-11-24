@@ -4,7 +4,6 @@ import copy
 import hashlib
 import json
 from html import unescape
-from pathlib import Path
 
 import pytest
 
@@ -199,11 +198,16 @@ def test_annex_metadata_and_parent_must_match(bundle, tmp_path, field, value):
 def test_overlay_must_match_identity_hash_and_existing_json(bundle, tmp_path, mutation):
     name = "review/human_review_overlays.json"
     data = read_json(bundle, name)
-    if mutation == "hash": data["records"][0]["raw_sha256"] = "0" * 64
-    elif mutation == "duplicate": data["records"].append(copy.deepcopy(data["records"][0]))
-    elif mutation == "parent": data["records"][0]["parent_mst"] = "999"
-    elif mutation == "value": data["records"][0]["updates"]["structured_image_summary"]["colors"][0]["color"] = "빨강"
-    else: data["records"] = []
+    if mutation == "hash":
+        data["records"][0]["raw_sha256"] = "0" * 64
+    elif mutation == "duplicate":
+        data["records"].append(copy.deepcopy(data["records"][0]))
+    elif mutation == "parent":
+        data["records"][0]["parent_mst"] = "999"
+    elif mutation == "value":
+        data["records"][0]["updates"]["structured_image_summary"]["colors"][0]["color"] = "빨강"
+    else:
+        data["records"] = []
     put_json(bundle, name, data)
     refresh_manifest(bundle)
     with pytest.raises(PreprocessedBundleError):
