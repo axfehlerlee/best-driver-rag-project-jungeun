@@ -36,7 +36,7 @@ PR을 열거나 갱신할 때와 `main` 또는 `dev`에 푸시할 때 검사한�
 
 ## 의존성과 런타임
 
-기존 `.python-version`, `pyproject.toml`과 `uv.lock`을 함께 사용한다. 이번 폴더 구조 변경에서는 Python, uv, 패키지와 GitHub Actions 버전을 바꾸지 않는다. 새 기능에 필요한 패키지는 해당 구현 PR에서 추가하고 잠금 파일과 실제 설치 결과를 함께 확인한다.
+`.python-version`과 `pyproject.toml`은 Python `3.13.14`로 맞추고 `uv.lock`도 같은 환경을 기준으로 관리한다. CI는 `.python-version`을 읽어 같은 Python 버전을 설치한다. uv와 GitHub Actions 버전은 유지한다. 새 기능에 필요한 패키지는 해당 구현 PR에서 추가하고 잠금 파일과 실제 설치 결과를 함께 확인한다.
 
 [Dependabot 설정](../.github/dependabot.yml)은 루트 Python 의존성인 `uv`와 `github-actions`를 매주 확인한다. 새 Dockerfile 등 별도 관리 대상이 생기면 실제 파일과 실행 환경을 확인한 뒤 해당 항목을 추가한다.
 
