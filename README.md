@@ -4,7 +4,7 @@
 
 확정 범위는 Streamlit 화면, A/B/C 검색, 동 이름 인식, 질문 다듬기와 getSpot 장소 지도다. 화면과 평가 실행기는 같은 Python RAG 함수를 호출한다.
 
-**현재는 폴더 구조, Python 파일 뼈대와 개발 환경을 준비한 단계다.** 시작 파일에는 역할과 담당만 표시되어 있으며 수집, 검색, 생성, 지도와 평가 실행 기능은 아직 구현하지 않았다. 각 담당자가 내부 파일을 확장하고 구현 순서를 정한다.
+**공통 기반 담당의 최소 인계 구현을 준비했다.** 문서 규격과 로더, 문서 단위 청킹, 로컬 색인, 팀 함수를 연결하는 파이프라인, 실행 원본 기록과 평가 실행기를 제공한다. 실제 A/B/C 검색, 답변 LLM, 지역 해석, 지도와 품질 지표는 담당자 구현을 연결해야 한다.
 
 ## 개발 환경
 
@@ -21,6 +21,16 @@ uv run --locked python -m pytest --version
 로컬 uv가 요구 버전보다 낮으면 전역 설치를 바꾸지 않고 `uv tool run --from uv==0.13.9 uv sync --locked`로 같은 환경을 준비할 수 있다. 첫 설치는 Python 배포 서버와 PyPI 연결이 필요하다. 이 방식으로 설치했다면 실행도 `uv tool run --from uv==0.13.9 uv run --locked python --version`처럼 같은 uv 버전을 사용한다. 기존 Python 3.15 가상환경도 동기화하면 `.python-version`에 맞는 3.13.14 환경으로 다시 생성한다.
 
 현재 의존성 파일은 루트의 공용 Python 환경을 관리한다. Streamlit, Selenium과 Langfuse 등 구현에 필요한 패키지는 해당 기능을 처음 연결하는 PR에서 의존성과 잠금 파일을 함께 갱신한다. 기존 FastAPI 의존성이 남아 있어도 별도 HTTP 서버 구현을 요구하지 않는다. 현재 `app.py`는 문서 문자열만 있는 뼈대이며 앱 실행 명령은 실제 화면 구현과 함께 추가한다.
+
+## 최소 인계본 실행
+
+```sh
+uv run --locked python -m scripts.demo
+```
+
+API 키 없이 합성 문서 3개로 색인부터 답변, 지역 재질문, 근거 부족과 실행 기록 저장까지 확인한다. 실행할 때마다 `results/local/handoff-demo-<실행 식별자>/`에 색인과 결과 JSON을 만든다. 해시 임베딩과 본문 인용을 사용하는 연결 검사이며 실제 분리배출 안내나 검색 품질 평가 결과가 아니다.
+
+입력 자료 규격, 색인/평가 명령, 팀 함수 연결 예시와 남은 범위는 [양석호 최소 구현 인계](docs/seokho-handoff.md)에 있다. `sources.json`은 문서 목록과 첨부 관계 입력이며 실제 본문은 별도로 연결한다. OpenAI 임베딩을 직접 선택할 경우 필요한 환경변수는 [.env.example](.env.example)을 참고한다.
 
 ## 작업 위치
 
@@ -43,4 +53,4 @@ uv run --locked python -m pytest --version
 - [개발 환경과 연결 기준](docs/TEAM-SETUP.md): 공용 규격과 인계 방식
 - [검사와 의존성 관리](docs/CI-AND-DEPENDENCIES.md): pytest, Codecov, Dependabot과 Gitleaks
 
-통합 기준 브랜치는 `dev`다. 작업 브랜치는 `feature/<작성자>/<작업명>`으로 만들고, 검증 후 `dev`를 대상으로 PR을 연다. 초기 구조에는 실제 평가셋과 실행 결과가 포함되어 있지 않다.
+통합 기준 브랜치는 `dev`다. 작업 브랜치는 `feature/<작성자>/<작업명>`으로 만들고, 검증 후 `dev`를 대상으로 PR을 연다. 합성 검증 자료는 `tests/fixtures/`에 있으며 실제 최종 평가셋과 품질 평가 결과는 포함되어 있지 않다.
