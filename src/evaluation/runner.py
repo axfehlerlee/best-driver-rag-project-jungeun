@@ -1,7 +1,7 @@
 """명시적으로 선택한 평가 문항을 구성별로 실행하고 원본 결과를 반환한다."""
 
-from collections.abc import Mapping, Sequence
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from pydantic import TypeAdapter, ValidationError

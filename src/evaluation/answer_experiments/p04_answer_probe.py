@@ -9,7 +9,6 @@ from typing import TypeGuard
 from src.contracts import PipelineRequest
 from src.generation.answer import AnswerDraft, ConflictSide, Evidence, GenerationInput
 
-
 _COLOR_ROW = re.compile(r"[\w·]+ \w+색")
 _COLOR_DOCUMENT_ID = "seodaemun-rules:attachment:160561037"
 _COLOR_SCOPE = "공동주택 일반용기 설치 기준"

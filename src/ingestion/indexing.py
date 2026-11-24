@@ -1,13 +1,17 @@
 """청크 전체에서 새 색인 스냅샷을 만든다. 이전 색인과 자동 병합하지 않는다."""
 
-from dataclasses import dataclass, field
 import hashlib
 import json
+from dataclasses import dataclass, field
 
 from src.contracts import Chunk
 from src.infrastructure.embeddings import EmbeddingProvider
 from src.infrastructure.stores import (
-    IndexEntry, IndexMetadata, IndexSnapshot, source_versions, validate_vector,
+    IndexEntry,
+    IndexMetadata,
+    IndexSnapshot,
+    source_versions,
+    validate_vector,
 )
 
 

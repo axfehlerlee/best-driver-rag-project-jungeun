@@ -1,13 +1,15 @@
 """제공된 XML/전처리 JSON을 형식별 공용 문서, 청크와 선택적 실제 색인으로 연결한다."""
 
 import argparse
-from collections import Counter
 import json
+from collections import Counter
 from pathlib import Path
 from uuid import uuid4
 
 from src.infrastructure.embeddings import (
-    BoundedEmbeddings, configure_key_file, create_openai_embeddings,
+    BoundedEmbeddings,
+    configure_key_file,
+    create_openai_embeddings,
 )
 from src.infrastructure.stores import save_index
 from src.ingestion.bundle_archive import extract_bundle

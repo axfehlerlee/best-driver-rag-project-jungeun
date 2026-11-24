@@ -2,8 +2,8 @@
 
 import math
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator

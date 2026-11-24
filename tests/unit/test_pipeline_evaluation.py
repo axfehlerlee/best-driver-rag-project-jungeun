@@ -5,10 +5,21 @@ import json
 import pytest
 
 from src.contracts import (
-    Chunk, EvaluationCase, GenerationResult, PipelineOptions, PipelineRequest,
-    PlaceLookupResult, ResolvedQuery, RunRecord, SearchCandidate,
+    Chunk,
+    EvaluationCase,
+    GenerationResult,
+    PipelineOptions,
+    PipelineRequest,
+    PlaceLookupResult,
+    ResolvedQuery,
+    RunRecord,
+    SearchCandidate,
 )
-from src.evaluation.runner import EvaluationCaseError, evaluate_cases, load_evaluation_cases
+from src.evaluation.runner import (
+    EvaluationCaseError,
+    evaluate_cases,
+    load_evaluation_cases,
+)
 from src.observability.records import RunRecorder
 from src.pipeline import RAGPipeline
 

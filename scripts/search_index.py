@@ -6,7 +6,9 @@ import math
 from pathlib import Path
 
 from src.infrastructure.embeddings import (
-    BoundedEmbeddings, configure_key_file, create_openai_embeddings,
+    BoundedEmbeddings,
+    configure_key_file,
+    create_openai_embeddings,
 )
 from src.infrastructure.stores import load_index, validate_vector
 

@@ -81,9 +81,9 @@ def _prepared_pair():
 
 
 def test_prepare_builds_separate_indexes_and_records_completion(tmp_path, monkeypatch):
-    from src.infrastructure.stores import load_index
-    import src.ingestion.preprocessed_bundle as bundle
     import scripts.prepare_data as command
+    import src.ingestion.preprocessed_bundle as bundle
+    from src.infrastructure.stores import load_index
 
     monkeypatch.setattr(bundle, "load_preprocessed_bundle", lambda *args, **kwargs: _prepared_pair())
     monkeypatch.setattr(command, "create_openai_embeddings", lambda model: Provider())
@@ -115,8 +115,8 @@ def test_second_format_failure_marks_partial_outputs_failed(tmp_path, monkeypatc
 
 
 def test_embedding_failure_preserves_error_type_and_completed_format(tmp_path, monkeypatch):
-    import src.ingestion.preprocessed_bundle as bundle
     import scripts.prepare_data as command
+    import src.ingestion.preprocessed_bundle as bundle
 
     class FailingProvider(Provider):
         def embed_documents(self, texts):

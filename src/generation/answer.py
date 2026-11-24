@@ -6,7 +6,6 @@ from copy import deepcopy
 from html import unescape
 from typing import Literal, NotRequired, TypedDict, TypeGuard
 
-
 # Source links travel in citations. The response body contains prose and excerpts.
 _LINK_MARKUP = re.compile(
     r"""[a-z][a-z0-9+.-]*:// | mailto: | tel: | www\.(?=[a-z0-9]) | //[a-z0-9\[]

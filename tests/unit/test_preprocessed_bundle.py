@@ -7,7 +7,10 @@ from html import unescape
 
 import pytest
 
-from src.ingestion.preprocessed_bundle import PreprocessedBundleError, load_preprocessed_bundle
+from src.ingestion.preprocessed_bundle import (
+    PreprocessedBundleError,
+    load_preprocessed_bundle,
+)
 
 
 def digest(payload):

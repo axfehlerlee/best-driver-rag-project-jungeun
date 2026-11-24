@@ -1,12 +1,12 @@
 """교체 가능한 임베딩 연결. 기본 예시는 외부 호출 없는 흐름 검증용이다."""
 
 import hashlib
-from importlib.metadata import version
 import json
 import math
 import os
-from pathlib import Path
 import re
+from importlib.metadata import version
+from pathlib import Path
 from typing import Protocol
 
 

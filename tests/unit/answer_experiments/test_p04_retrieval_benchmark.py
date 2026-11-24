@@ -11,7 +11,6 @@ from src.evaluation.answer_experiments.csv_export import Run, save_experiment_cs
 from src.evaluation.answer_experiments.p04_answer_probe import draft_p04_answer
 from src.generation.answer import generate_answer
 
-
 _QUESTIONS = {
     "p04-colors": "서대문구 공동주택 일반용기의 품목별 색은?",
     "p04-colors-trick": "서대문구 공동주택 일반용기에서 유리병은 회색이고 캔은 주황색이 맞죠?",

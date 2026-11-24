@@ -3,7 +3,12 @@
 import re
 
 from src.config import RuntimeSettings
-from src.contracts import GenerationResult, PipelineRequest, ResolvedQuery, SearchCandidate
+from src.contracts import (
+    GenerationResult,
+    PipelineRequest,
+    ResolvedQuery,
+    SearchCandidate,
+)
 from src.infrastructure.embeddings import DemoHashEmbeddings
 from src.infrastructure.stores import load_index
 from src.runtime import create_runtime

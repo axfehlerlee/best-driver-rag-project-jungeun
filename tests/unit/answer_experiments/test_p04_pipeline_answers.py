@@ -6,19 +6,27 @@ from pathlib import Path
 import pytest
 
 from src.config import RuntimeSettings
-from src.contracts import Chunk, PipelineOptions, ResolvedQuery, SearchCandidate, SourceDocument
+from src.contracts import (
+    Chunk,
+    PipelineOptions,
+    ResolvedQuery,
+    SearchCandidate,
+    SourceDocument,
+)
 from src.evaluation.answer_experiments.p04_answer_probe import (
     decode_p04_conditions,
     draft_p04_answer,
     make_p04_request,
 )
-from src.evaluation.answer_experiments.p04_retrieval_benchmark import _CASES, _p04_corpus
+from src.evaluation.answer_experiments.p04_retrieval_benchmark import (
+    _CASES,
+    _p04_corpus,
+)
 from src.generation.pipeline_adapter import make_answer_generator
 from src.ingestion.chunking import chunk_documents
 from src.ingestion.preprocessed_bundle import load_preprocessed_bundle
 from src.ingestion.preprocessed_chunking import chunk_preprocessed_documents
 from src.runtime import create_runtime
-
 
 PROJECT = Path(__file__).resolve().parents[3]
 BUNDLE = PROJECT / "data/handoff/jungeun/p04-2026-11-24"

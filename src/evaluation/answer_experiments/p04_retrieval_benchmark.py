@@ -18,7 +18,6 @@ from .csv_export import Candidate, ModelInput, Run, save_experiment_csv
 from .p04_answer_probe import draft_p04_answer
 from .retrieval import RetrievalDocument, RetrievalPort, prepare_adapters
 
-
 _TOP_K = 5
 _CONFIG_VERSION = "p04-char-tfidf-2-3-bm25-unicode-rrf60-equal-top5-v1"
 _ANSWER_CONFIG_VERSION = "p04-fixed-evidence-draft-v1"

@@ -19,7 +19,6 @@ from src.generation.answer import Evidence
 
 from .csv_export import Candidate
 
-
 _DOCUMENT_KEY = "experiment_document_id"
 _WORD = re.compile(r"[^\W_]+")
 

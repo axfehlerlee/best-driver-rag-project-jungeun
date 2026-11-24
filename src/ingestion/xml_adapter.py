@@ -6,9 +6,9 @@ XML 입력을 보존하고 검색 표현만 변환한다. JSON의 검색용 공�
 
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from dataclasses import dataclass
 from html import escape
-from collections.abc import Iterator
 
 
 class XMLAdapterError(ValueError):

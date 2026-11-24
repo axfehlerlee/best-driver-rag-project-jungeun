@@ -3,7 +3,12 @@
 from collections.abc import Callable, Mapping
 
 from src.contracts import Chunk, GenerationResult, PipelineRequest
-from src.generation.answer import AnswerDraft, Evidence, GenerationInput, generate_answer
+from src.generation.answer import (
+    AnswerDraft,
+    Evidence,
+    GenerationInput,
+    generate_answer,
+)
 
 
 class AnswerGenerationError(RuntimeError):

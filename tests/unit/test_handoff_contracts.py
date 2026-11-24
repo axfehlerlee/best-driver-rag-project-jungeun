@@ -8,7 +8,12 @@ import pytest
 from pydantic import ValidationError
 
 from src.contracts import (
-    Chunk, GenerationResult, PipelineRequest, ResolvedQuery, SearchCandidate, SourceDocument,
+    Chunk,
+    GenerationResult,
+    PipelineRequest,
+    ResolvedQuery,
+    SearchCandidate,
+    SourceDocument,
 )
 from src.ingestion.chunking import chunk_documents
 from src.pipeline import RAGPipeline

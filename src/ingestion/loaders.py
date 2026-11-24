@@ -27,7 +27,6 @@ from pydantic import (
 
 from src.contracts import SourceDocument
 
-
 # 번호의 선행 0, 제목과 URL의 원래 표기를 보존한다. 숫자를 문자열로 추정 변환하지 않는다.
 _NonBlankString = Annotated[
     str, StringConstraints(strict=True, min_length=1, pattern=r"\S")

@@ -2,9 +2,9 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -18,7 +18,6 @@ from src.ingestion.chunking import chunk_documents
 from src.ingestion.indexing import build_index
 from src.ingestion.loaders import load_source_documents
 from src.runtime import create_runtime
-
 
 ROOT = Path(__file__).resolve().parents[2]
 

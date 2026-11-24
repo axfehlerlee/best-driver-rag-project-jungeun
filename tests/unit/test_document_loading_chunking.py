@@ -14,7 +14,6 @@ from src.ingestion.loaders import (
     load_source_manifest,
 )
 
-
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 HTML_CONTENT = (
     '<table><tr><th>품목</th><th>안내</th></tr>\r\n'
