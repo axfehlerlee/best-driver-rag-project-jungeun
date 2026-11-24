@@ -15,7 +15,7 @@ _LINK_MARKUP = re.compile(
     re.IGNORECASE | re.MULTILINE | re.VERBOSE,
 )
 _SOURCE_ALIASES = {"document_id", "attachment_id", "pdf_sha256", "source_url"}
-_SOURCE_QUALIFIERS = ("attachment_id", "parent_mst", "pdf_sha256")
+_SOURCE_QUALIFIERS = {"attachment_id", "parent_mst", "pdf_sha256", "document_version"}
 
 
 class Evidence(TypedDict):
@@ -23,6 +23,9 @@ class Evidence(TypedDict):
     text: str
     chunk_id: str | None
     chunk_id_status: NotRequired[str]
+    scope_type: NotRequired[Literal["district", "common", "unknown"]]
+    districts: NotRequired[list[str]]
+    conditions: NotRequired[list[str]]
 
 
 class AnswerInput(TypedDict):
@@ -192,7 +195,7 @@ def _respond_to_conflict(sides: object, evidence: list[Evidence]) -> AnswerOutpu
 
 def _source_identity(source: dict[str, str]) -> dict[str, str]:
     identity = {}
-    for field in (*_SOURCE_ALIASES, "parent_mst", "evidence_file"):
+    for field in _SOURCE_ALIASES | _SOURCE_QUALIFIERS | {"evidence_file"}:
         value = source.get(field, "").strip()
         if field == "source_url":
             # Fragment identifiers locate passages in the same source.

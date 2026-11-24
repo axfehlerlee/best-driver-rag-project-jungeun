@@ -253,6 +253,7 @@ class InvalidDraftTests(TestCase):
         for other in (
             {"document_id": "guide-id", "source_url": first["source_url"]},
             {"pdf_sha256": "a" * 64, "source_url": f'{first["source_url"]}#page=3'},
+            {"document_version": "revision", "source_url": first["source_url"]},
         ):
             with self.subTest(other=other):
                 response = self._generate_conflict(
@@ -268,6 +269,7 @@ class InvalidDraftTests(TestCase):
             ({"attachment_id": "1"}, {"attachment_id": "2"}),
             ({"parent_mst": "1"}, {"parent_mst": "2"}),
             ({"pdf_sha256": "a" * 64}, {"pdf_sha256": "b" * 64}),
+            ({"document_version": "old"}, {"document_version": "new"}),
         ):
             with self.subTest(qualifiers=qualifiers):
                 response = self._generate_conflict(
