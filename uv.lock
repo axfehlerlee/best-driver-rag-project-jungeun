@@ -1502,6 +1502,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "ragas" },
     { name = "rank-bm25" },
+    { name = "tiktoken" },
     { name = "uvicorn" },
 ]
 
@@ -1527,6 +1528,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "ragas", specifier = ">=0.4.4" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "uvicorn" },
 ]
 
