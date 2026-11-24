@@ -18,7 +18,7 @@ def _write(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _prepare_data(args, output: Path, report: dict) -> dict:
+def _prepare_data(args, output: Path, report: dict) -> None:
     from src.ingestion.preprocessed_bundle import load_preprocessed_bundle
     from src.ingestion.preprocessed_chunking import chunk_preprocessed_documents
 
@@ -32,7 +32,7 @@ def _prepare_data(args, output: Path, report: dict) -> dict:
     selected = [d for d in prepared.documents if d.document_id in eligible]
     report.update(prepared.report)
     report.update({"version": args.version, "input_route": {"html": "XML -> HTML", "json": "preprocessed JSON -> JSON"},
-                   "index_status": "not_requested", "output_dir": str(output), "formats": {}})
+                   "output_dir": str(output), "formats": {}})
     _write(output / "documents.json", [d.model_dump(mode="json") for d in prepared.documents])
     _write(output / "identities.json", {s["source_key"]: s["document_id"] for s in report["sources"]})
     by_format = {}
@@ -56,21 +56,15 @@ def _prepare_data(args, output: Path, report: dict) -> dict:
         report["index_status"] = "running"
         report["stage"] = "embedding"
         _write(output / "report.json", report)
-        try:
-            for fmt, chunks in by_format.items():
-                index = build_index(chunks, embedder)
-                save_index(index, output / f"index-{fmt}.json")
-                report["formats"][fmt].update(index_id=index.metadata.index_id,
-                                               dimension=index.metadata.dimension)
-                _write(output / "report.json", report)
-        except Exception as error:
-            report["index_status"] = "failed"
-            report["error_type"] = type(error).__name__
+        # 바깥 prepare가 모든 단계의 실패를 한 번 기록한다.
+        # 여기서 예외를 감싸면 실제 제공자 오류 종류가 RuntimeError로 가려진다.
+        for fmt, chunks in by_format.items():
+            index = build_index(chunks, embedder)
+            save_index(index, output / f"index-{fmt}.json")
+            report["formats"][fmt].update(index_id=index.metadata.index_id,
+                                           dimension=index.metadata.dimension)
             _write(output / "report.json", report)
-            raise RuntimeError(f"임베딩 실패: {type(error).__name__}. report.json을 확인하세요.") from None
         report["index_status"] = "completed"
-        _write(output / "report.json", report)
-    return report
 
 
 def prepare(args) -> dict:

@@ -112,3 +112,32 @@ def test_second_format_failure_marks_partial_outputs_failed(tmp_path, monkeypatc
     assert report["status"] == "failed"
     assert report["stage"] == "chunking"
     assert not (args.output_dir / "index-html.json").exists()
+
+
+def test_embedding_failure_preserves_error_type_and_completed_format(tmp_path, monkeypatch):
+    import src.ingestion.preprocessed_bundle as bundle
+    import scripts.prepare_data as command
+
+    class FailingProvider(Provider):
+        def embed_documents(self, texts):
+            if self.calls:
+                raise TypeError("provider detail must not be recorded")
+            return super().embed_documents(texts)
+
+    provider = FailingProvider()
+    monkeypatch.setattr(bundle, "load_preprocessed_bundle", lambda *args, **kwargs: _prepared_pair())
+    monkeypatch.setattr(command, "create_openai_embeddings", lambda model: provider)
+    args = SimpleNamespace(bundle=tmp_path, version="v1", output_dir=tmp_path / "output",
+                           openai_model="text-embedding-3-small", api_key_file=None,
+                           identities=None, max_characters=12000)
+    with pytest.raises(RuntimeError, match="embedding 단계 실패: TypeError") as caught:
+        prepare(args)
+    saved = (args.output_dir / "report.json").read_text(encoding="utf-8")
+    report = json.loads(saved)
+    assert report["status"] == report["index_status"] == "failed"
+    assert report["stage"] == "embedding"
+    assert report["error_type"] == "TypeError"
+    assert report["formats"]["html"]["index_id"]
+    assert (args.output_dir / "index-html.json").exists()
+    assert not (args.output_dir / "index-json.json").exists()
+    assert "provider detail" not in saved + str(caught.value)
