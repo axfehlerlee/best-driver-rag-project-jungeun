@@ -1,6 +1,50 @@
-# 공통 기반 최소 인계본
+# 공통 기반과 실제 자료 인계
 
-이 문서는 양석호 담당 공통 기반을 팀 코드에 연결하는 방법과 현재 구현 범위를 설명한다. 로컬 파일과 합성 자료로 호출 흐름을 확인하는 인계본이며, 실제 분리배출 서비스의 검색 품질이나 운영 준비를 입증하는 결과는 아니다. 담당 구분의 기준은 [구조와 책임](architecture.md), 팀 연결 규칙은 [공동 입출력](TEAM-SETUP.md)에 둔다.
+이 문서는 양석호 담당 공통 기반을 팀 코드에 연결하는 방법과 현재 구현 범위를 설명한다. PR 8의 실제 전처리 자료로 XML 유래 HTML/JSON 색인을 만들고 근거 조회까지 확인했다. 공통 응답 파이프라인은 합성 데모로 검증했으며 팀 A/B/C 검색과 답변 LLM, UI는 아직 연결하지 않았다. 담당 구분은 [구조와 책임](architecture.md), 팀 연결 규칙은 [공동 입출력](TEAM-SETUP.md)에 둔다.
+
+## 실제 전처리 자료 연결
+
+수집과 HWP 전처리의 책임은 [PR 8](https://github.com/kssk3/best-driver-rag-project/pull/8)에 있다. 공통 기반은 제공된 v2 ZIP의 해시와 문서 관계를 확인하고, 이미 만들어진 XML/JSON을 읽는다. 원문을 다시 수집하거나 ZIP 안의 코드를 실행하지 않는다. 확인한 PR head는 `7598fa3`이며 전처리 파일 44개와 원본 파일 23개가 제공된 ZIP과 바이트 단위로 일치했다.
+
+`src/ingestion/xml_adapter.py`의 `xml_to_html`은 본문 `LawService` XML의 조문/부칙과 첨부 `HwpDoc` XML의 문단/표/병합셀을 HTML로 변환한다. 작성자/폰트 메타데이터와 제개정이유는 검색 본문에 넣지 않는다. XML의 공백과 문구를 보존하며 DTD/entity 선언과 잘못된 표 좌표는 거부한다. 같은 원문의 전처리 JSON은 문자열을 유지해 읽는다. `SourceDocument`와 `Chunk`의 `html/json` 계약은 유지한다.
+
+`load_preprocessed_bundle`은 본문 4개와 첨부 19개를 각각 HTML/JSON 쌍으로 읽어 공용 문서 46개를 만든다. 부모/첨부 관계, 지역, 시행일, 출처 URL과 보관 원본의 프로젝트 상대 `raw_path`를 연결한다. 두 표현은 `document_id`와 `version`을 공유하고 `content_format`으로 구분한다. 삭제 첨부 2개는 제외 기록에 남긴다. 서식 8개와 표지판 1개는 문서로 보관하되 품목별 근거 색인에서 제외하므로, 형식별 색인 대상은 본문 4개와 첨부 10개다.
+
+사람 검수 보정은 부모 MST, 첨부 ID와 원본 해시가 일치할 때 적용한다. 표지판 분류와 그림의 품목별 색상 정보처럼 검수된 범위를 유지하며 실제 수거시설 현황으로 확대하지 않는다. HTML과 JSON 양쪽에서 같은 보정 내용을 사용한다.
+
+`chunk_preprocessed_documents`는 본문의 조문/부칙 단위와 표 행을 사용한다. 표 행에는 병합된 상위 셀, 머리글과 같은 별표 구획의 모든 문단 및 후행 비고를 함께 넣는다. 삭제 조문과 삭제 별표 구획은 색인에서 제외하고 부칙의 과거/현행 혼재 주의를 유지한다. 중첩표는 별도 의미 연결 규격이 없어 현재 청커가 거부한다. 문자 한도를 넘는 내용을 임의로 자르지 않는다.
+
+기본 청킹은 JSON의 원문 `text`를 사용한다. `rows_for_search.search_text`의 용어 정규화는 적용하지 않는다. 따라서 현재 실험은 XML→HTML과 JSON의 같은 원문 표현을 비교하는 경로이며, 원시 XML 문자열이나 정규화 개선 효과의 비교가 아니다.
+
+### 준비와 실제 색인 명령
+
+저장소 루트에서 실행한다. 입력 ZIP은 별도로 받아 보관해야 하며 아래 경로는 예시다. `--version v1`은 원문 버전이고 인계 파일명의 `v2`와 다른 값이다. 출력 폴더는 새 경로여야 한다.
+
+```powershell
+uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_review_2026-11-24_v2.zip" --version v1 --output-dir data/processed/p04-v2-prepared
+```
+
+위 명령은 외부 API 없이 준비한다. 실제 색인까지 만들 때는 `OPENAI_API_KEY` 환경변수를 설정한 프로세스에서 다음 명령을 사용한다. `.env` 파일은 자동으로 읽지 않는다. 기존 로컬 키 파일을 사용하려면 `--api-key-file "C:/비공개/openai-key.txt"`처럼 명시적으로 추가한다. 키 내용은 출력하거나 결과 JSON에 기록하지 않는다.
+
+```powershell
+uv run --locked python -m scripts.prepare_data --bundle "C:/자료/p04_data_review_2026-11-24_v2.zip" --version v1 --output-dir data/processed/p04-v2-openai-small --openai-model text-embedding-3-small
+```
+
+생성물은 `documents.json`, `identities.json`, `chunks-html.json`, `chunks-json.json`, `report.json`이며 실제 색인을 요청하면 `index-html.json`과 `index-json.json`도 만든다. ZIP 입력은 필요한 원본과 전처리 자료를 `input/`에 보관한다. 데이터와 생성물, 키 파일은 Git 추적 대상이 아니다. 실패한 실행도 `report.json`에 상태, 단계와 오류 종류를 남기므로 일부 파일의 존재만으로 성공을 판단하지 않는다.
+
+같은 자료를 다시 처리할 때는 다른 출력 폴더를 사용한다. 수집처 식별자가 바뀐 개정본에도 기존 문서 ID를 유지해야 한다면 이전 `identities.json`의 `source_key`와 ID 연결을 확인해 `--identities`로 제공한다. 원문 버전은 호출자가 명시하며 로더가 개정을 추정하지 않는다.
+
+### 실제 근거 조회
+
+현재 확인한 로컬 색인은 `data/processed/p04-v2-openai-small/`에 있다. 이 폴더는 Git에 포함되지 않으므로 새 환경에서는 위 준비 명령으로 생성해야 한다. 같은 임베딩 인증 설정을 사용한다.
+
+```powershell
+uv run --locked python -m scripts.search_index --index data/processed/p04-v2-openai-small/index-html.json --index data/processed/p04-v2-openai-small/index-json.json --district 송파구
+```
+
+질문을 반복 입력하고 `/종료`로 종료한다. `--question "질문"`으로 한 번만 조회할 수 있고, 이때 `--output results/local/검색기록.json`을 추가하면 전체 근거를 새 파일에 저장한다. 화면에는 청크 본문의 앞부분과 출처를 표시한다. 공백 질문/지역은 실행 전에 거부한다.
+
+이 도구는 같은 질문 벡터로 두 색인을 조회하며 지역이 다른 청크와 지역 미확인 청크를 제외한다. 실제 벡터의 단순 코사인 유사도 확인용으로, 답변 생성이나 팀 A/B/C 검색 구현을 대신하지 않는다. 지역은 `--district`로 지정하고 문장에서 추론하지 않는다.
 
 ## 처음 실행하기
 
@@ -36,11 +80,11 @@ uv run --locked python -m scripts.chat --demo
 
 구를 입력한 뒤 질문을 계속 입력한다. `품목알파`는 구별 합성 안내를 반환하고, `공통시험품목`은 공통 합성 문서를 사용한다. `없는품목오메가`는 근거 부족을 확인하는 예시다. `/구 송파구` 또는 `/구`로 지역을 변경하고 `/종료`로 종료한다. 빈 질문은 건너뛰며 Ctrl+C와 입력 종료도 지원한다.
 
-각 질문은 독립 처리하므로 이전 질문이나 추가 확인 답변을 이어서 해석하지 않는다. 실제 분리배출 규칙과 LLM은 연결되어 있지 않다. 색인은 합성 문서로 자동 준비하며 원본 기록은 실행마다 새로운 `results/local/chat-demo-<실행 식별자>/runs/`에 남긴다. 터미널에서는 HTML 태그를 읽기 쉬운 문자열로 표시하고 기록에는 원본 응답을 보존한다. `--output-dir`를 직접 지정하면 아직 존재하지 않는 폴더여야 한다.
+각 질문은 독립 처리하므로 이전 질문이나 추가 확인 답변을 이어서 해석하지 않는다. 이 `scripts.chat --demo` 경로에는 실제 분리배출 규칙과 LLM이 연결되어 있지 않다. 색인은 합성 문서로 자동 준비하며 원본 기록은 실행마다 새로운 `results/local/chat-demo-<실행 식별자>/runs/`에 남긴다. 터미널에서는 HTML 태그를 읽기 쉬운 문자열로 표시하고 기록에는 원본 응답을 보존한다. `--output-dir`를 직접 지정하면 아직 존재하지 않는 폴더여야 한다.
 
 ## 자료를 교체하는 방법
 
-입력은 역할에 따라 세 가지로 구분한다.
+전처리 묶음 연결 외에 기존 파일을 직접 읽는 공용 로더는 다음과 같다.
 
 | 입력 | 함수 | 반환과 범위 |
 | --- | --- | --- |
@@ -74,7 +118,7 @@ document = load_preprocessed_content(
 
 공용 문서 목록은 `SourceDocument` 필드의 JSON 객체들을 배열에 넣는다. 합성 fixture처럼 `{"documents": [...], "is_synthetic": true, "description": "..."}` 형태도 지원한다. 문서 ID, 버전, 표현 형식이 모두 같은 항목은 중복으로 거부한다. 같은 원문의 HTML/JSON 표현은 원문 ID/버전을 공유하고 형식으로 구분할 수 있다.
 
-기존 `SourceDocument` 클래스와 의미는 유지했다. 부모 ID와 버전의 참조 형태를 검사하지만, 부모가 별도 파일에 있을 수 있어 이 로더에서 부모 존재를 강제하지 않는다. HTML은 요소 존재와 명백한 잘림을 검사하는 수준이다. JSON 파싱과 문자열 보존이 원문 의미나 표/각주의 완전한 검수를 대신하지는 않는다. HWP/PDF 추출과 검수 ZIP의 초안 JSON을 공용 문서로 변환하는 전용 어댑터는 포함하지 않는다.
+기존 `SourceDocument` 클래스와 의미는 유지했다. 부모 ID와 버전의 참조 형태를 검사하지만, 부모가 별도 파일에 있을 수 있어 이 일반 로더에서 부모 존재를 강제하지 않는다. HTML은 요소 존재와 명백한 잘림을 검사하는 수준이다. JSON 파싱과 문자열 보존이 원문 의미나 표/각주의 완전한 검수를 대신하지는 않는다. v2 묶음에는 위 `load_preprocessed_bundle` 전용 경로를 사용하며 HWP/PDF 직접 추출은 수집/전처리 담당 영역이다.
 
 ## 청킹과 색인
 
@@ -90,9 +134,9 @@ index = build_index(chunks, DemoHashEmbeddings(dimensions=64), cache=cache)
 save_index(index, "data/indexes/example.json")
 ```
 
-현재 `chunk_documents`는 문서 전체를 하나의 청크로 만든다. 임의의 문자 분할로 표의 공통 비고와 예외 조건이 떨어지는 것을 피하기 위한 최소 구현이다. 기본 한도 20,000자는 Python 문자열의 문자 수이며 모델 토큰 한도가 아니다. 초과하면 문서 ID를 포함한 오류를 내고 자동 분할하거나 일부를 버리지 않는다. 큰 자료에는 표/별표 등 논리 단위 분할을 별도로 구현해야 한다.
+일반 입력용 `chunk_documents`는 문서 전체를 하나의 청크로 만든다. 기본 한도 20,000자는 Python 문자열의 문자 수이며 모델 토큰 한도가 아니다. 초과하면 문서 ID를 포함한 오류를 내고 자동 분할하거나 일부를 버리지 않는다. 실제 v2 자료에는 앞서 설명한 `chunk_preprocessed_documents`의 조문/표 행 분할을 사용한다.
 
-청크는 원문 ID/버전, 표현 형식, 제목, 본문, URL과 적용 지역을 보존하며 `source_location`은 현재 `"문서 전체"`다. `conditions=[]`는 별도 조건 추출을 하지 않았다는 뜻이다. 본문에 있는 조건과 예외는 삭제하지 않는다. 청크 ID는 원문 ID/버전, 표현 형식, 본문, 출처 URL과 청킹 버전으로 결정하므로 동일 입력과 규칙에서는 재실행해도 유지된다.
+청크는 원문 ID/버전, 표현 형식, 제목, 본문, URL과 적용 지역을 보존한다. 일반 전체 청크의 `source_location`은 `"문서 전체"`이며 v2 청크는 조문/부칙 위치 또는 `table-N/row[R]`를 사용한다. `conditions=[]`는 별도 조건 추출을 하지 않았다는 뜻이다. 본문에 있는 조건과 예외는 삭제하지 않는다. 동일 입력과 청킹 규칙에서는 청크 ID가 재실행해도 유지된다.
 
 `EmbeddingProvider`는 `identity`, `embed_documents(texts)`, `embed_query(text)` 경계다. 기존 LangChain 임베더는 `LangChainEmbeddingsAdapter`로 연결할 수 있다. 모델, 차원과 벡터에 영향을 주는 설정이 바뀌면 `identity`도 바꿔야 한다. 실제 OpenAI 연결을 선택할 때는 `create_openai_embeddings(model, dimensions=...)` 또는 색인 CLI의 `--openai-model`을 사용한다. 인계 데모에서는 이 경로를 사용하지 않는다.
 
@@ -121,7 +165,7 @@ save_index(index, "data/indexes/example.json")
 | 인수 | 호출 규격 | 담당 연결 지점 |
 | --- | --- | --- |
 | `resolver` | `(PipelineRequest) -> ResolvedQuery` | 지역/동 해석과 추가 확인 필요 여부 |
-| `rewriter` | `(ResolvedQuery) -> str` | 조건을 보존한 검색 질의 변환, 생략 가능 |
+| `rewriter` | `(ResolvedQuery) -> str` | 해석된 검색 질의 변환. 원래 요청의 `conditions`는 아직 전달되지 않음 |
 | `retriever` | `(ResolvedQuery, *, variant, top_k) -> list[SearchCandidate]` | A/B/C 검색 구현 |
 | `generator` | `(PipelineRequest, list[Chunk]) -> GenerationResult` | 원질문과 실제 입력 근거를 사용한 답변/인용 ID |
 | `place_lookup` | `(PipelineRequest, ResolvedQuery) -> PlaceLookupResult` | 장소 조회, 생략 가능 |
@@ -159,6 +203,10 @@ print(response.status, response.answer)
 
 파이프라인은 지역 확인, 선택적 질의 변환, 검색, 생성 입력 선택, 생성과 인용 검사를 수행한다. 지역 확인이 필요하면 뒤 단계를 건너뛴다. 질의 변환이 실패하면 이전 검색 질의를 사용하고 경고를 남긴다. 생성 입력에서는 지역 미확인 청크와 다른 지역의 청크를 제외하며, 문맥 문자 수 한도를 넘으면 청크 전체를 제외한다. 이 한도는 `PipelineOptions.max_context_chars`이고 토큰 한도가 아니다.
 
+공용 계약에는 다음 연결 문제가 남아 있다. 현재 `rewriter`는 `ResolvedQuery`만 받으며 원질문과 `PipelineRequest.conditions`를 직접 받을 수 없다. 실패 시 사용하는 값도 `resolver`의 `search_query`여서 팀 요구사항인 원질문 복귀와 다를 수 있다. `(PipelineRequest, ResolvedQuery) -> str`로 확장하고 실패 시 원질문을 사용하는 변경안은 담당자 합의 전 제안이며 아직 적용하지 않았다.
+
+`validation.py`와 `tracing.py`를 주입하는 전용 인자는 없다. 생성 콜백 내부에서 공용 검증 함수를 호출하고 재생성/보류할 수는 있으나, 그 시도별 결과를 공용 단계 기록으로 받는 계약은 없다. 파이프라인의 마지막 인용 검사는 실제 입력에 없는 인용을 오류로 처리하는 최종 확인이다. 생성 담당의 복구 정책, 공용 검증 결과 형식과 추적 연결 위치는 담당자와 별도 확정해야 한다. `RunRecorder`는 호출마다 실패를 포함한 실행을 별도 파일에 저장하며, 재시도 번호나 이전 시도 연결을 제공하지 않는다.
+
 `answered`에는 실제 생성 입력에 포함된 청크의 인용 ID가 필요하다. 검색 후보에만 있던 ID를 인용하면 `error`로 기록한다. 장소 조회 실패는 `response.places`의 상태로 별도 표시한다. 지역/품목 조건의 의미 판단과 근거 부족 응답 정책은 주입한 콜백의 책임도 포함하므로, 이 흐름만으로 답변 정확성을 보장하지 않는다.
 
 ## 설정, 실행 기록과 평가
@@ -188,8 +236,9 @@ print(response.status, response.answer)
 | 파일 | 제공하는 역할 | 교체하거나 연결할 부분 |
 | --- | --- | --- |
 | `src/contracts.py` | 공용 문서/청크/요청/응답/기록 타입 | 팀 함수의 입출력에서 공통으로 사용 |
-| `src/ingestion/loaders.py` | 출처 목록과 명시적인 공용 문서 파일 읽기 | 실제 전처리 결과에서 공용 규격으로의 변환 |
-| `src/ingestion/chunking.py` | 문서 전체 청크와 안정적인 ID | 표, 제목, 비고와 적용 조건을 보존하는 논리 단위 분할 |
+| `src/ingestion/loaders.py` | 출처 목록과 명시적인 공용 문서 파일 읽기 | 일반 입력의 출처 메타데이터 제공 |
+| `src/ingestion/bundle_archive.py`, `preprocessed_bundle.py`, `xml_adapter.py` | v2 묶음 검증과 XML→HTML/JSON 문서 쌍 생성 | 새 전처리 규격, 개정본 ID 연결과 추가 검수 범위 |
+| `src/ingestion/chunking.py`, `preprocessed_chunking.py` | 일반 문서 전체 청크와 v2 조문/표 행 청크 | 품질 검증에 따른 분할 개선 |
 | `src/ingestion/indexing.py` | provider 기반 색인 스냅샷 생성과 메모리 캐시 | 실제 임베딩 provider와 갱신 정책 |
 | `src/infrastructure/embeddings.py` | provider 경계, 데모 해시 임베딩, LangChain 연결 | 사용할 모델과 설정 |
 | `src/infrastructure/stores.py` | 검증 가능한 로컬 JSON 색인 저장/읽기 | 실제 DB/벡터 저장소 |
@@ -200,6 +249,7 @@ print(response.status, response.answer)
 | `src/demo.py`, `scripts/demo.py` | 외부 API 없는 합성 흐름 확인 | 실제 서비스 성능 평가로 대체하지 않음 |
 | `scripts/chat.py` | 구 선택과 반복 질문 입력, 출처 표시 | 합성 자료 전용이며 대화 기억과 실제 지역 추론 없음 |
 | `scripts/index.py`, `scripts/evaluate.py` | 명시적인 입력/출력 파일을 받는 CLI | 실제 자료와 검증용 사례 경로 |
+| `scripts/prepare_data.py`, `scripts/search_index.py` | v2 자료 준비/실제 색인과 지역 제한 근거 조회 | 팀 검색/생성 파이프라인 연결, 검색 품질 개선 |
 
 ## 구현 경계와 검증
 
@@ -207,11 +257,16 @@ print(response.status, response.answer)
 
 2026-11-24, Python 3.13.14 환경에서 확인한 결과는 다음과 같다. 테스트 명령과 CI 설정은 [검사와 의존성 관리](CI-AND-DEPENDENCIES.md)를 따른다.
 
-- 직접 질문 실행기 검사를 포함한 전체 테스트 183개가 `pytest tests`에서 통과했다. `src`, `scripts`, `app.py`의 `compileall`도 통과했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
+- 전체 테스트 272개와 커버리지 XML 생성, `src`, `scripts`, `app.py`의 문법 검사, 잠금 파일 및 설치 의존성 호환성 검사를 통과했다. 이 테스트는 아래에 명시한 실제 자료/API 확인과 별도이며 공용 계약의 미구현 부분을 완료로 바꾸지 않는다.
+- 별도의 새 Python 3.13.14 가상환경에서도 `uv sync --locked`로 111개 패키지를 설치하고 전체 테스트 272개를 통과했다. 다른 운영체제나 사용자 PC에서의 재현을 확인한 결과는 아니다.
+
+- XML 어댑터 단위 검사와 실제 v2 파일 23개 대조에서 본문 121단위/부칙 4구획, 표 32개/셀 2,643개의 원문 텍스트, 좌표와 병합 보존을 확인했다. 기존 `SourceDocument`의 AST가 변경 전과 일치함을 확인했다.
+- 실제 `text-embedding-3-small` 호출로 HTML/JSON 각각 557개 청크, 1,536차원 색인을 완성했다. 로컬 입력 토큰 계수는 HTML 498,212개(청크 최대 2,145개), JSON 408,678개(최대 2,007개)다. 이는 전송할 문자열의 로컬 계수이며 제공자 사용량/청구 내역이 아니다.
+- 실제 근거 조회 3개 질문을 두 색인에 실행했다. 송파구 일반주택 음식물 배출시간의 같은 근거는 HTML 1위와 JSON 2위에 나타났다. 우유팩 전용 수거함 부재와 페트병 라벨 질문은 양쪽 상위 3개에서 해당 품목별 별표가 빠졌다. 검색 동작 확인이며 품질 우열이나 정확도 평가 결과로 해석하지 않는다.
 - 실제 데모 CLI에서 출처 목록 4건과 첨부 21건을 읽고, 합성 문서 3개의 청크와 실행 JSON 3개를 생성했다. 결과는 `answered`, `needs_clarification`, `insufficient_evidence`로 구분됐다.
 - 색인 CLI의 기본 64차원 결과를 평가 CLI가 읽는 흐름, 연결 함수 오류의 기록과 종료 코드 1, 재실행 시 기존 결과를 덮어쓰지 않는 동작을 통합 테스트로 확인했다.
 - 직접 질문 CLI에서는 구 변경에 따른 답변/출처, 근거 부족, 지역 재질문, 빈 입력과 종료, 원본 기록 보존을 확인했다.
 
-실제 외부 API, DB와 팀 모듈 연결은 검증하지 않았다. 위 결과는 로컬 공통 흐름과 오류 처리의 검증이며, 실제 분리배출 답변 정확도나 HTML/JSON 성능 비교 결과가 아니다.
+실제 임베딩 API와 로컬 근거 조회까지 검증했다. DB, 팀 A/B/C 검색, 답변 LLM, 지도/UI와 최종 품질 평가는 연결 전이며 bge-m3 비교도 미실행이다. 합성 데모와 실제 색인 성공을 분리배출 답변 정확도나 최종 HTML/JSON 품질 비교 완료로 해석하지 않는다.
 
 코드 변경과 로컬 실행 결과를 원격 배포나 원격 PR 완료로 해석하지 않는다. 팀 저장소로 공유할 때는 실제 변경과 검증 결과를 기준으로 별도 PR을 작성한다.
