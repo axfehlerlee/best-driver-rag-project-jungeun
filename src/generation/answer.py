@@ -110,9 +110,12 @@ def generate_answer(
     if not evidence:
         return _insufficient_evidence()
 
-    model_input: GenerationInput = deepcopy(
-        {"original_question": question, "conditions": conditions, "evidence": evidence}
-    )
+    snapshot: GenerationInput = {
+        "original_question": question,
+        "conditions": conditions,
+        "evidence": evidence,
+    }
+    model_input = deepcopy(snapshot)
     # Resolve citations from the input snapshot even if the adapter edits its copy.
     try:
         draft = draft_answer(deepcopy(model_input))

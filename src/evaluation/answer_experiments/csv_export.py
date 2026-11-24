@@ -197,15 +197,16 @@ def _build_rows(run: Run) -> tuple[dict[str, object], list[dict[str, object]]]:
     inputs_by_rank = {}
     for model_input in run.model_inputs:
         rank = model_input.rank
-        candidate = candidates_by_rank.get(rank)
+        matched_candidate = candidates_by_rank.get(rank)
         evidence = model_input.evidence
         if (
             type(rank) is not int
-            or candidate is None
+            or matched_candidate is None
             or rank in inputs_by_rank
-            or _citation_identity(evidence) != _citation_identity(candidate.evidence)
+            or _citation_identity(evidence)
+            != _citation_identity(matched_candidate.evidence)
             or not evidence["text"]
-            or evidence["text"] not in candidate.evidence["text"]
+            or evidence["text"] not in matched_candidate.evidence["text"]
         ):
             raise ValueError(f"Model input does not match candidate rank {rank!r}")
         inputs_by_rank[rank] = evidence
@@ -256,7 +257,7 @@ def _build_rows(run: Run) -> tuple[dict[str, object], list[dict[str, object]]]:
         "evaluation_ms": run.evaluation_ms,
         "evaluation_score": run.evaluation_score,
     }
-    candidate_rows = []
+    candidate_rows: list[dict[str, object]] = []
     for rank, candidate in candidates_by_rank.items():
         evidence = candidate.evidence
         source = evidence["source"]

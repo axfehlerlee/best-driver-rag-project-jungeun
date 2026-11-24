@@ -258,7 +258,7 @@ def _run_answer_probe(
         evidence = sources[key].evidence
         source = {**evidence["source"], "experiment_document_id": key}
         candidates.append(Candidate(rank, {**evidence, "source": source}))
-    model_inputs = []
+    model_inputs: list[ModelInput] = []
 
     def draft(payload: GenerationInput) -> AnswerDraft:
         model_inputs.extend(

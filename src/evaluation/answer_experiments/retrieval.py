@@ -36,7 +36,9 @@ class RetrievalDocument:
 class RetrievalPort(Protocol):
     """Return ranked candidates within a previously prepared district scope."""
 
-    name: str
+    @property
+    def name(self) -> str:
+        """Return the method label used to group benchmark runs."""
 
     def search(self, query: str, *, district: str, k: int) -> list[Candidate]:
         """Return up to k candidates, with k within the prepared depth."""
@@ -145,8 +147,8 @@ def prepare_adapters(
         key=lambda item: item.document_key,
     )
     embeddings = CharacterTfidf([item.evidence["text"] for item in eligible])
-    vector_indexes = {}
-    ensemble_indexes = {}
+    vector_indexes: dict[str, BaseRetriever | None] = {}
+    ensemble_indexes: dict[str, BaseRetriever | None] = {}
     for district in scopes:
         pool = [
             Document(
