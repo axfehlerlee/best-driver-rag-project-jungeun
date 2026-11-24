@@ -4,14 +4,14 @@
 
 팀의 최종 목표는 Streamlit 화면, A/B/C 검색, 동 이름 인식, 질문 다듬기와 getSpot 장소 지도다. 화면과 평가 실행기가 같은 Python RAG 함수를 호출하도록 연결한다.
 
-**P04 can be tested locally with the reviewed HTML/JSON documents, the district resolver and an evidence-based answer callback.** The runtime accepts these components through dependency injection. The team A/B/C retriever, production answer model and Streamlit UI still need integration.
+**검토를 마친 P04 자료로 지역 해석부터 근거 기반 답변까지 로컬에서 검증할 수 있다.** 공통 런타임을 만들 때 지역 해석기와 검색기, 답변 생성기를 지정한다. 팀 A/B/C 검색기, 운영용 답변 모델, Streamlit 화면 연결은 후속 작업이다.
 
 | 구분 | 현재 상태 |
 | --- | --- |
-| Documents | PR #8 supplied the P04 bundle. PR #10 corrected HWP text handling and form classification. The preparation CLI builds paired HTML/JSON chunks and supports optional embedding indexes. |
+| 문서 처리 | PR #8에서 P04 자료를 제공했고, PR #10에서 HWP 문자 처리와 별지 분류를 보완했다. 자료 준비 명령은 같은 원문의 HTML·JSON 청크를 생성하며, 옵션을 지정하면 임베딩 색인도 만든다. |
 | 공통 실행 | 팀 함수 연결, 지역별 근거 선택, 인용 검사, 실행 JSON 기록과 평가 실행기 구현 |
 | 직접 실행 | 실제 색인의 근거 조회 CLI와 API 키 없는 합성 응답 데모 실행 가능 |
-| Region and answer | PR #11 provides the district resolver with a four-dong practice map. The P04 generator reads fixed evidence and validates citations. Vector and BM25/vector ranking experiments run separately. |
+| 지역 해석과 답변 | PR #11의 지역 해석기는 연습용 매핑표에 있는 동 4곳의 자치구를 판별한다. P04 답변 실험은 미리 지정한 근거로 답변과 인용을 검증한다. 벡터 단독과 BM25+벡터 앙상블의 검색 순위는 별도 실험에서 비교한다. |
 
 파일별 구현 범위와 검증 결과의 기준 문서는 [공통 기반 인계본](docs/seokho-handoff.md)이며, 담당자별 연결 지점은 [Notion 인수인계](https://app.notion.com/p/422dc8b0e16381758494e218a97087aa)에서도 확인할 수 있다. 검색/생성 연결 함수가 준비돼 있다는 사실과 실제 서비스가 동작한다는 사실을 구분한다.
 
@@ -31,7 +31,7 @@ uv run --locked python -m pytest --version
 
 ## 실제 자료 준비와 근거 조회
 
-The tracked P04 handoff incorporates [PR #8](https://github.com/kssk3/best-driver-rag-project/pull/8) and the corrections in [PR #10](https://github.com/kssk3/best-driver-rag-project/pull/10). Run the following from the repository root and choose a new output directory.
+저장소의 P04 인계 자료에는 [PR #8의 전처리 결과](https://github.com/kssk3/best-driver-rag-project/pull/8)와 [PR #10의 수정 사항](https://github.com/kssk3/best-driver-rag-project/pull/10)이 반영돼 있다. 저장소 루트에서 아래 명령을 실행하고, 출력 경로에는 아직 없는 폴더를 지정한다.
 
 ```sh
 uv run --locked python -m scripts.prepare_data --bundle data/handoff/jungeun/p04-2026-11-24 --version v1 --output-dir data/processed/p04-v2-prepared
@@ -63,9 +63,9 @@ uv run --locked python -m scripts.demo
 
 API 키 없이 합성 문서 3개로 색인부터 답변, 지역 재질문, 근거 부족과 실행 기록 저장까지 확인한다. 실행할 때마다 `results/local/handoff-demo-<실행 식별자>/`에 색인과 결과 JSON을 만든다. 해시 임베딩과 본문 인용을 사용하는 연결 검사이며 실제 분리배출 안내나 검색 품질 평가 결과가 아니다.
 
-### Test the answer and region changes after pulling dev
+### dev 반영 후 답변과 지역 해석 검증
 
-With Python 3.13.14 and uv 0.13.9 or later, run these commands from the repository root after the answer PR merges. The P04 tests and benchmark use local evidence and require no model API key.
+답변 PR이 머지되면 저장소 루트에서 아래 명령을 실행한다. Python 3.13.14와 uv 0.13.9 이상을 사용한다. P04 테스트와 검색 비교는 로컬 자료를 사용하므로 모델 API 키가 필요 없다.
 
 ```sh
 git switch dev
@@ -75,9 +75,9 @@ uv run --locked python -m pytest -q tests/unit/generation tests/unit/answer_expe
 uv run --locked python -m src.evaluation.answer_experiments.p04_retrieval_benchmark --output-dir results/local/p04-team-check --repeats 10
 ```
 
-Use a fresh output directory for each benchmark run. For the full suite, run `uv run --locked python -m pytest -q tests`. On the branch integrating PR #11, the focused suite passed 68 tests and 25 subtests, and the full suite passed 403 tests and 25 subtests on Python 3.13.14. Both emitted the existing LangChain Community deprecation warning.
+검색 비교를 다시 실행할 때마다 새 출력 폴더를 지정한다. 전체 테스트 명령은 `uv run --locked python -m pytest -q tests`다. PR #11을 통합한 브랜치에서 위의 답변·지역 해석 테스트 68개와 하위 검사 25개가 통과했다. 같은 환경에서 전체 테스트 403개와 하위 검사 25개가 통과했다. 두 실행 모두 기존 LangChain Community 사용 중단 예정 경고가 1건 발생했다.
 
-The [P04 comparison](results/testData.md) explains the saved CSVs and the three answer cases. The [runtime handoff](docs/TEAM-SETUP.md#p04-runtime-handoff) describes how an inferred district reaches retrieval and what the generator receives.
+[P04 질문별 결과표](results/testData.md)에서 세 사례의 검색 순위, 답변, 인용을 CSV 원본과 대조할 수 있다. 동 이름에서 추론한 구를 검색기와 생성기가 각각 어떻게 사용하는지는 [지역 해석과 답변 생성 연결](docs/TEAM-SETUP.md#p04-지역-해석과-답변-생성-연결)에 정리했다.
 
 입력 자료 규격, 색인/평가 명령과 팀 함수 연결 예시는 [인계 문서](docs/seokho-handoff.md)에 있다. `sources.json`은 문서 목록과 첨부 관계를 읽는 별도 입력이며 전처리 묶음 대신 넣지 않는다. OpenAI 임베딩 환경변수는 [.env.example](.env.example)을 참고한다.
 

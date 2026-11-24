@@ -1,2 +1,2 @@
-# Answer generation
-Follow the [project workflow](../../ROADMAP.md) and its [module integration rules](../../docs/TEAM-SETUP.md) when changing answer generation.
+# 답변 생성
+답변 생성 코드를 변경할 때는 [프로젝트 진행 계획](../../ROADMAP.md)과 [모듈 연결 기준](../../docs/TEAM-SETUP.md)을 따른다.

@@ -25,17 +25,17 @@ UI는 Streamlit으로 구현하고 공통 Python RAG 함수를 직접 호출하�
 
 같은 형식을 각 모듈에 복제하지 않는다. 공용 규격 변경은 호출 코드, 예시, 검증과 문서를 함께 맞춘다. 내부 파일과 함수 구성은 담당자가 정한다.
 
-### P04 runtime handoff
+### P04 지역 해석과 답변 생성 연결
 
-Pass `src.retrieval.regions.resolve_request` as the resolver and `make_answer_generator(draft_p04_answer, decode_conditions=decode_p04_conditions)` as the generator to `create_runtime`. Supply a retriever that returns ranked `SearchCandidate` objects. Read the response from `runtime.run(request).response`. The [fixed-evidence test](../tests/unit/answer_experiments/test_p04_pipeline_answers.py) shows the request, chunk and citation contracts. It injects a controlled resolver and retriever.
+`create_runtime`의 지역 해석기로 `src.retrieval.regions.resolve_request`를, 생성기로 `make_answer_generator(draft_p04_answer, decode_conditions=decode_p04_conditions)`를 전달한다. 검색기는 순위순으로 정렬한 `SearchCandidate` 목록을 반환해야 한다. 최종 응답은 `runtime.run(request).response`에서 읽는다. [고정 근거 테스트](../tests/unit/answer_experiments/test_p04_pipeline_answers.py)는 지역 해석 결과와 검색 근거를 미리 지정해 요청·청크·인용을 검증한다. 아래 표는 PR #11의 실제 지역 해석기를 연결하고 같은 색상 근거를 제공했을 때의 결과다.
 
-| Input to the PR #11 resolver with the same reviewed color chunk available | Observed runtime behavior |
+| 연희동 수거용기 색상 질문의 입력 조건 | 공통 런타임에서 확인한 결과 |
 | --- | --- |
-| Yeonhui-dong color question with Seodaemun-gu explicitly selected | Retrieval receives Seodaemun-gu. Generation answers with the reviewed colors and cites the supplied chunk. |
-| Same question with only the dong in the text | Retrieval receives the inferred Seodaemun-gu. Generation receives the original request without a district, so the P04 reviewed-color path returns `insufficient_evidence`. |
-| Same question with Songpa-gu explicitly selected | Resolution requests clarification before retrieval or generation. |
+| 사용자가 서대문구를 선택 | 검색기는 서대문구로 검색한다. 생성기는 원문에 적힌 색상으로 답하고 전달받은 청크를 인용한다. |
+| 질문에 연희동만 입력하고 구는 선택하지 않음 | 검색기는 연희동에서 추론한 서대문구로 검색한다. 생성기는 구가 비어 있는 원래 요청을 받으므로, 같은 근거를 주어도 `insufficient_evidence`를 반환한다. |
+| 사용자가 송파구를 선택 | 선택한 구와 연희동에서 추론한 구가 달라 검색과 생성 전에 지역을 다시 묻는다. |
 
-For the current P04 color check, pass the district explicitly. A shared contract decision is needed if the generator must use inferred scope. Preserve the original question and record the resolved region separately. The practice map contains four dongs. Wirye is a fixed-evidence observation with Songpa-gu supplied explicitly.
+현재 P04 색상 답변을 확인할 때는 구를 명시한다. 생성기에서도 추론한 지역을 사용하려면 원질문을 보존하면서 해석된 구·동을 전달하는 방식을 팀에서 정해야 한다. 연습용 매핑표에는 동 4곳이 들어 있다. 위례동 일정 충돌은 송파구를 명시하고 근거를 고정한 별도 관찰 사례다.
 
 ## 질문, 지역과 답변
 

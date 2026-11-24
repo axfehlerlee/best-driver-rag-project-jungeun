@@ -6,13 +6,13 @@
 
 ## 현재 도달지점
 
-As of 2026-11-24, PRs #8 and #10 supply the reviewed P04 bundle, and PR #11 supplies a district resolver. The answer branch adds fixed-evidence runtime tests and a two-retriever experiment. These cover parts of Steps 2–4. The final 20-question evaluation remains pending.
+2026-11-24 기준으로 PR #8과 #10의 P04 전처리 자료와 PR #11의 자치구 해석기를 사용할 수 있다. 답변 브랜치에서는 근거를 고정한 공통 런타임 테스트와 두 검색 방식의 비교 실험을 추가했다. 이는 STEP 2~4의 일부에 해당하며, 최종 20문항 평가는 남아 있다.
 
 | 영역 | 현재 구현과 검증 | 연결에 남은 일 |
 | --- | --- | --- |
-| Data and index | Reviewed P04 bundle, HTML/JSON document pairs, article/row chunking and local embedding indexes | Refine chunking, compare bge-m3 and connect the team retriever and database |
-| Questions and runs | District resolution, scoped context selection, answer and citation validation, per-run JSON and experimental CSVs | Pass inferred location to generation, integrate production A/B/C retrieval, rewrite, answer model, places and UI |
-| Evaluation | Six regular/trick questions for ranking and fixed-evidence checks, with Wirye tracked as an observation | Integrate the development and final sets, Ragas, Hit@5 and Langfuse, and run the final comparison |
+| 자료와 색인 | 검토한 P04 자료, 같은 원문의 HTML·JSON 문서 쌍, 조문·표 행 단위 청킹, 로컬 임베딩 색인 | 청킹 개선, bge-m3 비교, 팀 검색기와 DB 연결 |
+| 질문과 실행 기록 | 자치구 해석, 지역에 맞는 근거 선택, 답변·인용 검증, 실행별 JSON과 실험 비교용 CSV 저장 | 추론한 지역을 생성기에 전달하는 방법 합의, 운영 A/B/C 검색·질문 다듬기·답변 모델·장소 조회·화면 연결 |
+| 평가 | 일반 질문과 함정 질문 총 6개로 검색 순위와 고정 근거 답변을 검증한다. 위례동은 별도 관찰 사례로 기록한다. | 개발셋과 최종셋 연결, Ragas·Hit@5·Langfuse 연동, 최종 비교 실행 |
 
 실제 자료의 색인과 단순 근거 조회까지 연결했으며, STEP 3의 답변 생성까지 포함한 전체 흐름과 이후 최종 평가 진입 조건은 아직 확인하지 않았다. 현재 형식 비교는 같은 원문 `text`를 사용하며 JSON의 `search_text` 정규화 효과를 측정하지 않는다. 검색 품질 우열과 bge-m3 비교 결과는 아직 없다.
 

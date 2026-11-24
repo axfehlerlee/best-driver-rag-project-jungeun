@@ -6,11 +6,11 @@
 
 공통 기반과 통합 담당자(양석호)가 실행과 원본 저장을 연결한다. 검색 지표와 답변 평가는 각 담당자가 제공하고 화면과 관찰 검증 담당자(이승주)가 결과 비교와 실패 분석에 활용한다.
 
-## P04 experiment exports
+## P04 검색·답변 실험 결과
 
-The [P04 comparison](testData.md) links the committed CSV snapshot. Use the [benchmark command](../README.md#test-the-answer-and-region-changes-after-pulling-dev) to reproduce it in a new directory under `results/local/`. Each of `vector/`, `ensemble/` and `answers/` has its own `runs.csv` and `candidates.csv`. Join rows on `run_id`. A blank candidate count means no candidate list was received. A zero is a completed search with no hits.
+[P04 질문별 결과표](testData.md)에서 저장소에 포함된 CSV 원본을 열 수 있다. 재현하려면 [검색 비교 명령](../README.md#dev-반영-후-답변과-지역-해석-검증)을 실행하고 `results/local/` 아래에 새 출력 폴더를 지정한다. 출력 폴더 안의 `vector/`, `ensemble/`, `answers/`에는 각각 `runs.csv`와 `candidates.csv`가 생긴다. 같은 실행의 두 파일은 `run_id`로 연결한다. `candidate_count`가 빈칸이면 후보 목록을 받지 못했고, `0`이면 검색을 마쳤지만 찾은 후보가 없다는 뜻이다.
 
-The two retrieval directories report rankings and timings. The answer directory uses separately supplied evidence for the three trick questions. The shared runtime writes a JSON run record. The experimental CSV exporter runs through the benchmark entry point.
+`vector/`와 `ensemble/`에는 검색 순위와 소요 시간이 기록된다. `answers/`에는 함정 질문 3개에 근거를 직접 제공해 얻은 답변이 기록된다. 이 CSV들은 검색 비교 명령을 실행할 때 생성된다. 공통 런타임은 실행별 기록을 JSON으로 저장한다.
 
 최초 실패, 재시도와 변경 후 추가 실험은 별도로 남긴다. `RunRecord.duration_ms`는 기록 파일 저장 전까지의 파이프라인 시간이며 리라이트 시간을 포함한다. 현재 토큰 사용량, API 비용과 Ragas 사후 평가 시간은 자동 수집하지 않는다. 합성 데모는 `run_kind="demo"`로 기록하며 실제 검색/생성 결과와 구분한다.
 
