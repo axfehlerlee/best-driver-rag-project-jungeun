@@ -6,6 +6,7 @@ from src.contracts import Chunk, ResolvedQuery
 from src.ingestion.indexing import build_index
 from src.retrieval.search import (
     RetrievalConfigError,
+    RetrievalError,
     cosine_similarity,
     is_in_region,
     make_vector_retriever,
@@ -124,6 +125,12 @@ def test_vector_search_rejects_wrong_dimension():
     # 오류를 빈 결과로 숨기지 않는다.
     with pytest.raises(ValueError):
         vector_search(make_index(), [1.0, 0.0], "서대문구", top_k=5)
+
+
+def test_vector_search_rejects_non_positive_top_k():
+    # top_k가 0이면 빈 결과가 아니라 입력 오류로 알린다.
+    with pytest.raises(RetrievalError):
+        vector_search(make_index(), [1.0, 0.0, 0.0], "서대문구", top_k=0)
 
 
 # --- make_vector_retriever (파이프라인 규격) --------------------------------
