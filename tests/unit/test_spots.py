@@ -21,6 +21,14 @@ def test_extract_items_handles_empty_result():
     assert extract_items(raw) == []
 
 
+def test_extract_items_wraps_single_item_dict():
+    # 결과가 하나뿐이면 item이 목록이 아니라 dict 하나로 올 수 있다 → 목록으로 맞춘다.
+    spot = {"spotNm": "의류 수거함"}
+    raw = {"response": {"body": {"items": {"item": spot}}}}
+
+    assert extract_items(raw) == [spot]
+
+
 def test_infer_collection_types_from_spot_name():
     # 표기가 달라도(·, 공백) 같은 품목을 찾는다.
     assert sorted(infer_collection_types("폐형광등·폐건전지 수거함")) == ["폐건전지", "폐형광등"]

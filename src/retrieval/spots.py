@@ -69,11 +69,6 @@ def parse_places(raw: dict, district: str) -> list[PlaceResult]:
         if district not in address:
             continue
 
-        # ②: PlaceResult 만들어서 places에 추가
-        # name=장소명, address=주소, source_url=GETSPOT_SOURCE_URL,
-        # collection_types=infer_collection_types(장소명),
-        # place_id=f"getspot-{len(places) + 1}"  (임시 ID, DB 단계에서 바꿀 예정)
-
         spot_name = item.get("spotNm", "")
 
         places.append(PlaceResult(
@@ -81,6 +76,6 @@ def parse_places(raw: dict, district: str) -> list[PlaceResult]:
             address=address,
             source_url=GETSPOT_SOURCE_URL,
             collection_types=infer_collection_types(spot_name),
-            place_id=f"getspot-{len(places) + 1}", # (임시 ID, DB 단계에서 바꿀 예정)
+            place_id=f"getspot-{len(places) + 1}", # 임시 ID, DB 단계에서 바꿀 예정
         ))
     return places
