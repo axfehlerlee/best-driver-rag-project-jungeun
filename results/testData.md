@@ -96,7 +96,7 @@
 | experiment_kind | synthetic | synthetic |
 | case_group | development, observation | development, observation |
 | run_state | retrieval_completed | completed |
-| corpus_snapshot_id | evidence-synthetic-6e2cf9ace99ba501 | evidence-synthetic-6e2cf9ace99ba501 |
+| corpus_snapshot_id | evidence-synthetic-659b116d9a74717f | evidence-synthetic-659b116d9a74717f |
 | config_version | evidence-char-tfidf-2-3-bm25-unicode-rrf60-equal-top5-v1 | evidence-fixed-evidence-draft-v1 |
 
 | 실험 | 실행별 기록(`runs.csv`, 실행당 한 행) | 후보별 기록(`candidates.csv`, 후보당 한 행) |
