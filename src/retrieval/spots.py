@@ -21,10 +21,26 @@ GETSPOT_SOURCE_URL = "https://www.data.go.kr/data/15156866/openapi.do"
 
 # 장소명에서 찾을 품목 키워드. 같은 품목이 여러 표기로 와서(폐형광등·폐건전지 / 폐형광등 폐건전지)
 # 장소명 전체가 아니라 키워드 포함 여부로 판단한다.
+# 2026-11-25 실제 응답(연희동·잠실동)의 장소명 전체를 확인해 정했다.
 COLLECTION_KEYWORDS: tuple[str, ...] = (
-    "폐건전지", "폐형광등", "의류", "폐의약품", "종량제봉투",
-    "투명페트병", "종이팩", "아이스팩", "소형가전", "폐가전",
+    "폐건전지",
+    "폐형광등",
+    "의류",
+    "폐의약품",
+    "투명페트병",
+    "종이팩",
+    "아이스팩",
+    "소형가전",
+    "폐가전",
+    "캔",
+    "폐식용유",
+    "폐휴대폰",
 )
+
+# 장소명에 이 표시가 있으면 받는 품목을 추론하지 않는다.
+# - 판매소: 종량제봉투를 파는 곳이지 무언가를 받는 곳이 아니다.
+# - RFID: 음식물 종량기는 등록 세대의 RFID 카드가 있어야 쓸 수 있어 일반 안내에서 뺀다.
+NON_COLLECTION_MARKERS: tuple[str, ...] = ("판매소", "RFID")
 
 
 def extract_items(raw: dict) -> list[dict]:
@@ -43,8 +59,11 @@ def infer_collection_types(spot_name: str) -> list[str]:
     """장소명에서 받는 품목을 추론한다.
 
     예: "폐형광등·폐건전지 수거함" → ["폐건전지", "폐형광등"]
-    품목 키워드가 없으면 빈 목록 (모르는 품목을 받는다고 단정하지 않는다).
+    품목 키워드가 없거나 수거 장소가 아니면 빈 목록
+    (모르는 품목을 받는다고 단정하지 않는다).
     """
+    if any(marker in spot_name for marker in NON_COLLECTION_MARKERS):
+        return []
 
     # COLLECTION_KEYWORDS 중 spot_name 안에 들어 있는 것만 모아서 돌려주기
     found = []
@@ -58,24 +77,31 @@ def parse_places(raw: dict, district: str) -> list[PlaceResult]:
     """getSpot 응답을 district(예: "서대문구")에 있는 장소만 PlaceResult로 바꾼다.
 
     좌표는 응답에 없으므로 None으로 둔다 (추측해서 채우지 않는다).
+    좌표가 없어 상세 위치(addrDtl)가 찾아가는 단서이므로, 있으면 주소 뒤에 붙인다.
     """
     places: list[PlaceResult] = []
 
     for item in extract_items(raw):
-        address = item.get("addrBase", "")
+        # 공공 API는 빈 값을 null로 줄 수 있다. .get(키, "")는 키가 없을 때만 ""를 쓰고
+        # 값이 None이면 None을 돌려주므로, `or ""`로 None도 빈 문자열로 맞춘다.
+        base_address = item.get("addrBase") or ""
 
-        # 다른 시(인천 연희동 등)를 거르기
-        # address에 district가 들어 있지 않으면 건너뛰기 (continue)
-        if district not in address:
+        # 다른 시(인천 연희동 등)를 거르기. 상세 위치에 다른 구 이름이 섞여도
+        # 헷갈리지 않도록 구 판단은 기본 주소(addrBase)로만 한다.
+        if district not in base_address:
             continue
 
-        spot_name = item.get("spotNm", "")
+        detail = (item.get("addrDtl") or "").strip()
+        address = f"{base_address} {detail}" if detail else base_address
+        spot_name = item.get("spotNm") or ""
 
-        places.append(PlaceResult(
-            name=spot_name,
-            address=address,
-            source_url=GETSPOT_SOURCE_URL,
-            collection_types=infer_collection_types(spot_name),
-            place_id=f"getspot-{len(places) + 1}", # 임시 ID, DB 단계에서 바꿀 예정
-        ))
+        places.append(
+            PlaceResult(
+                name=spot_name,
+                address=address,
+                source_url=GETSPOT_SOURCE_URL,
+                collection_types=infer_collection_types(spot_name),
+                place_id=f"getspot-{len(places) + 1}",  # 임시 ID, DB 단계에서 바꿀 예정
+            )
+        )
     return places

@@ -31,13 +31,36 @@ def test_extract_items_wraps_single_item_dict():
 
 def test_infer_collection_types_from_spot_name():
     # 표기가 달라도(·, 공백) 같은 품목을 찾는다.
-    assert sorted(infer_collection_types("폐형광등·폐건전지 수거함")) == ["폐건전지", "폐형광등"]
-    assert sorted(infer_collection_types("폐형광등 폐건전지 수거함")) == ["폐건전지", "폐형광등"]
+    assert sorted(infer_collection_types("폐형광등·폐건전지 수거함")) == [
+        "폐건전지",
+        "폐형광등",
+    ]
+    assert sorted(infer_collection_types("폐형광등 폐건전지 수거함")) == [
+        "폐건전지",
+        "폐형광등",
+    ]
 
 
 def test_infer_collection_types_returns_empty_for_unknown_name():
     # 품목을 알 수 없는 장소명은 빈 목록 (받는다고 단정하지 않는다).
     assert infer_collection_types("재활용정거장") == []
+
+
+def test_infer_collection_types_excludes_sales_place():
+    # 판매소는 파는 곳이지 받는 곳이 아니다 → 수거 품목에서 제외 (PR 리뷰 반영).
+    assert infer_collection_types("종량제봉투 판매소") == []
+
+
+def test_infer_collection_types_excludes_rfid_food_waste_bin():
+    # 음식물 RFID 종량기는 등록 세대만 쓸 수 있어 일반 안내에서 뺀다.
+    assert infer_collection_types("음식물류폐기물 종량기 RFID") == []
+
+
+def test_infer_collection_types_recognizes_added_keywords():
+    # 실제 응답에서 품목이 분명한데 빠져 있던 장소명.
+    assert infer_collection_types("캔 무인회수기") == ["캔"]
+    assert infer_collection_types("폐식용유 수거함") == ["폐식용유"]
+    assert infer_collection_types("폐휴대폰 배출처") == ["폐휴대폰"]
 
 
 def test_parse_places_drops_other_city_with_same_dong_name():
@@ -55,3 +78,30 @@ def test_parse_places_keeps_unknown_coordinates_as_none():
     assert place.name == "폐형광등·폐건전지 수거함"
     assert place.latitude is None and place.longitude is None
     assert sorted(place.collection_types) == ["폐건전지", "폐형광등"]
+
+
+def test_parse_places_handles_null_fields():
+    # 공공 API는 빈 값을 null로 줄 수 있다 → 에러 없이 빈 문자열로 처리 (PR 리뷰 반영).
+    item = {
+        "spotNm": None,
+        "addrBase": "서울특별시 서대문구 연희동 9-9",
+        "addrDtl": None,
+    }
+    null_city = {"spotNm": "의류 수거함", "addrBase": None, "addrDtl": None}
+    raw = {"response": {"body": {"items": {"item": [item, null_city]}}}}
+
+    places = parse_places(raw, "서대문구")
+
+    assert len(places) == 1  # 주소가 null이면 구를 확인할 수 없어 제외
+    assert places[0].name == ""
+    assert places[0].address == "서울특별시 서대문구 연희동 9-9"
+    assert places[0].collection_types == []
+
+
+def test_parse_places_keeps_detail_address():
+    # 좌표가 없으니 상세 위치가 있으면 주소에 남긴다 (PR 리뷰 반영).
+    # 상세 위치가 비어 있으면 끝에 공백을 붙이지 않는다.
+    places = parse_places(load_sample(), "서대문구")
+
+    assert places[0].address == "서울특별시 서대문구 연희동 1-1 연희동 주민센터"
+    assert places[1].address == "서울시 서대문구 연희로 10"
