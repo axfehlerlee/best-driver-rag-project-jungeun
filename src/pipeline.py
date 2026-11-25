@@ -344,6 +344,18 @@ class RAGPipeline:
                         ),
                     ),
                 )
+                # 콜백이 예외 대신 실패 결과를 돌려준 경우도 단계 기록에 실패로 남긴다.
+                # stage()가 방금 추가한 place_lookup 기록이며, 응답과 places는 그대로 둔다.
+                if response.places.status == "error":
+                    reported = (response.places.error or "").strip()
+                    stages[-1] = stages[-1].model_copy(
+                        update={
+                            "status": "error",
+                            "error": reported
+                            or "장소 조회 콜백이 실패 상태를 반환했습니다.",
+                            "error_code": "pipeline.place_lookup_failed",
+                        }
+                    )
             except Exception as error:
                 # 코드는 place_lookup 단계 기록에 남고, 문서 답변 상태는 바꾸지 않는다.
                 response.places = PlaceLookupResult(

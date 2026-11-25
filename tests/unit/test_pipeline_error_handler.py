@@ -11,6 +11,7 @@ from src.contracts import (
     PipelineOptions,
     PipelineRequest,
     PipelineResponse,
+    PlaceLookupResult,
     ResolvedQuery,
     RunRecord,
     SearchCandidate,
@@ -283,6 +284,44 @@ def test_answer_generator_failure_reaches_response_with_generation_code():
 
     record = pipeline(generator=make_answer_generator(bad_draft)).run(request())
 
-    assert record.response.error_code == "generation.invalid_draft"
+    assert record.response.error_code == "generation.invalid_citation"
     assert record.response.answer == "답변을 준비하는 중 오류가 발생했습니다."
-    assert stage_of(record, "generate").error_code == "generation.invalid_draft"
+    assert stage_of(record, "generate").error_code == "generation.invalid_citation"
+
+
+def test_reported_place_lookup_error_marks_its_stage_without_failing_answer():
+    def reported_failure(request, resolved):
+        return PlaceLookupResult(status="error", error="getSpot 응답 시간 초과")
+
+    record = pipeline(place_lookup=reported_failure).run(request())
+
+    stage = stage_of(record, "place_lookup")
+    assert stage.status == "error"
+    assert stage.error_code == "pipeline.place_lookup_failed"
+    assert "getSpot 응답 시간 초과" in stage.error
+    assert record.response.status == "answered"
+    assert record.response.error_code is None
+    assert record.response.places.status == "error"
+    assert record.response.places.error == "getSpot 응답 시간 초과"
+
+
+def test_place_lookup_without_error_status_keeps_stage_ok():
+    def empty(request, resolved):
+        return PlaceLookupResult(status="empty")
+
+    record = pipeline(place_lookup=empty).run(request())
+
+    assert stage_of(record, "place_lookup").status == "ok"
+    assert stage_of(record, "place_lookup").error_code is None
+
+
+@pytest.mark.parametrize("reported", [None, "   "])
+def test_reported_place_error_without_detail_uses_fallback_text(reported):
+    def reported_failure(request, resolved):
+        return PlaceLookupResult(status="error", error=reported)
+
+    record = pipeline(place_lookup=reported_failure).run(request())
+
+    stage = stage_of(record, "place_lookup")
+    assert stage.error == "장소 조회 콜백이 실패 상태를 반환했습니다."
+    assert stage.error_code == "pipeline.place_lookup_failed"

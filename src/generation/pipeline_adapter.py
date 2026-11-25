@@ -20,7 +20,10 @@ class AnswerGenerationError(ApplicationError, RuntimeError):
     """Expose a stable failure reason through the shared pipeline error state.
 
     The message stays the bare reason (e.g. ``invalid_draft``); ``code`` carries
-    ``generation.<reason>`` for evaluation. RuntimeError is kept for compatibility.
+    ``generation.<reason>`` for evaluation. A reason that is not a single snake_case
+    segment is coded ``generation.invalid_error_kind``, and a raise without ``code``
+    keeps the default ``generation.failed`` (unclassified). RuntimeError is kept for
+    compatibility.
     """
 
     code = "generation.failed"

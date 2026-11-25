@@ -80,7 +80,7 @@ def test_citation_outside_context_and_provider_failure_are_sanitized():
             "citation_indices": [1],
         }
     )
-    with pytest.raises(AnswerGenerationError, match="invalid_draft"):
+    with pytest.raises(AnswerGenerationError, match="invalid_citation"):
         make_answer_generator(draft)(request, [_chunk()])
     failing_draft = Mock(side_effect=ValueError("private provider diagnostic"))
     with pytest.raises(AnswerGenerationError, match="generation_failed") as error:
@@ -147,7 +147,7 @@ def _raise_decode(conditions):
             ),
             "supplied-id",
             None,
-            "invalid_draft",
+            "invalid_citation",
         ),
         (
             Mock(side_effect=ValueError("provider")),
@@ -188,3 +188,42 @@ def test_malformed_error_kind_is_recorded_as_invalid_error_kind(monkeypatch, kin
 
     assert error.value.code == "generation.invalid_error_kind"
     assert str(error.value) == (kind if isinstance(kind, str) else "generation_failed")
+
+
+def _answered(message, indices):
+    return {"status": "answered", "message": message, "citation_indices": indices}
+
+
+@pytest.mark.parametrize(
+    ("draft_output", "kind"),
+    [
+        # 인용 문제는 생성 오류와 구분해 평가의 '잘못된 인용'으로 분류한다.
+        (_answered("근거 안내", [1]), "invalid_citation"),
+        (_answered("근거 안내", [0, 5]), "invalid_citation"),
+        (_answered("근거 안내", ["0"]), "invalid_citation"),
+        (_answered("근거 안내", []), "missing_citation"),
+        (_answered("근거 안내", None), "missing_citation"),
+        (
+            {
+                "status": "source_conflict",
+                "conflict_sides": [
+                    {"evidence_index": 0, "excerpt": "검증된 내용"},
+                    {"evidence_index": 5, "excerpt": "다른 내용"},
+                ],
+            },
+            "invalid_citation",
+        ),
+        # 답변 형식이 먼저다. 형식이 틀리면 인용이 틀려도 invalid_draft로 남는다.
+        (_answered("https://example.org/unverified 참고", [1]), "invalid_draft"),
+        (_answered("", [1]), "invalid_draft"),
+        ({"status": "unknown"}, "invalid_draft"),
+    ],
+)
+def test_citation_problems_get_their_own_reason(draft_output, kind):
+    generator = make_answer_generator(Mock(return_value=draft_output))
+
+    with pytest.raises(AnswerGenerationError) as error:
+        generator(PipelineRequest(question="근거는?"), [_chunk()])
+
+    assert str(error.value) == kind
+    assert error.value.code == f"generation.{kind}"
