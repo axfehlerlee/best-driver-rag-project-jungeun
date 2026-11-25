@@ -239,9 +239,12 @@ class CsvExportTests(TestCase):
             ["1", "2", "3"],
         )
         self.assertFalse(
-            {"evidence-pending", "evidence-zero"} & {row["run_id"] for row in candidates}
+            {"evidence-pending", "evidence-zero"}
+            & {row["run_id"] for row in candidates}
         )
-        signage = next(row for row in candidates if row["run_id"] == "evidence-filtered")
+        signage = next(
+            row for row in candidates if row["run_id"] == "evidence-filtered"
+        )
         self.assertEqual(signage["attachment_id"], "160319461")
         self.assertEqual(signage["used_in_model_input"], "false")
         self.assertEqual(signage["cited_in_answer"], "false")

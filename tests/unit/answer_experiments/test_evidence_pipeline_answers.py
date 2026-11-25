@@ -109,7 +109,9 @@ def test_evidence_original_and_trick_questions_use_shared_runtime(
             SearchCandidate(chunk=chunk, rank=rank)
             for rank, chunk in enumerate(evidence, start=1)
         ],
-        generator=make_answer_generator(draft, decode_conditions=decode_evidence_conditions),
+        generator=make_answer_generator(
+            draft, decode_conditions=decode_evidence_conditions
+        ),
     )
     request = make_evidence_request(
         case.question, district=case.district, conditions=case.conditions
@@ -189,7 +191,10 @@ def test_evidence_items_encoding_preserves_plain_conditions():
     request = make_evidence_request(
         "질문", district="송파구", conditions={"items": values, "foo": "[1]"}
     )
-    assert decode_evidence_conditions(request.conditions) == {"items": values, "foo": "[1]"}
+    assert decode_evidence_conditions(request.conditions) == {
+        "items": values,
+        "foo": "[1]",
+    }
     ordinary = make_evidence_request(
         "질문", district="송파구", conditions={"items": '["유리"]'}
     )

@@ -8,7 +8,9 @@ import pytest
 
 from src.evaluation.answer_experiments import evidence_retrieval_benchmark as benchmark
 from src.evaluation.answer_experiments.csv_export import Run, save_experiment_csv
-from src.evaluation.answer_experiments.evidence_answer_probe import draft_evidence_answer
+from src.evaluation.answer_experiments.evidence_answer_probe import (
+    draft_evidence_answer,
+)
 from src.generation.answer import generate_answer
 
 _QUESTIONS = {
@@ -168,7 +170,11 @@ def test_trick_answers_correct_abstain_and_record_conflict_with_supplied_evidenc
     runs = {row["question_id"]: row for row in answer_rows}
     candidates = read_rows(output / "answers" / "candidates.csv")
     assert len(answer_rows) == 3
-    assert set(runs) == {"evidence-colors-trick", "evidence-signage-trick", "evidence-wirye-trick"}
+    assert set(runs) == {
+        "evidence-colors-trick",
+        "evidence-signage-trick",
+        "evidence-wirye-trick",
+    }
     assert all(
         row["retrieval_ms"] == row["evaluation_score"] == "" for row in answer_rows
     )
