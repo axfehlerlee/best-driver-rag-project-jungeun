@@ -103,9 +103,9 @@ info.detail        # 실행 기록에 남긴다. 예: "ValueError: boom"
 | `StageRecord.error`, `StageRecord.error_code` | 해당 단계가 실패 | 그 단계의 내부 상세와 원인 코드 |
 | `PlaceLookupResult.error` | 장소 조회 실패 | 내부 상세. 코드는 `place_lookup` 단계 기록에 있다. |
 
-- 질문 다듬기와 장소 조회가 실패해도 문서 답변은 계속 진행한다. 이때 응답의 `error_code`는 `None`이고 코드는 `rewrite` 또는 `place_lookup` 단계 기록에만 남는다.
+- 질문 다듬기와 장소 조회가 실패해도 문서 답변은 계속 진행한다. 이때 응답의 `error_code`는 `None`이고 코드는 `rewrite` 또는 `place_lookup` 단계 기록에만 남는다. 장소 조회는 예외를 던진 경우와 `PlaceLookupResult(status="error")`를 반환한 경우 모두 `place_lookup` 단계가 `error`로 기록된다.
 - 실행 기록 저장이 실패하면 응답이 `error`로 바뀐다. 이미 앞 단계에서 실패했다면 응답의 `error_code`는 최초 원인을 유지한다.
-- 평가는 실패한 단계 이름과 `error_code`를 묶어 실패를 분류한다. 예: `citations` 단계의 `pipeline.citation_outside_evidence`는 잘못된 인용이다.
+- 평가는 실패한 단계 이름과 `error_code`를 묶어 실패를 분류한다. 예: `citations` 단계의 `pipeline.citation_outside_evidence`와 `generate` 단계의 `generation.invalid_citation`·`generation.missing_citation`은 잘못된 인용이다.
 - 여러 단계가 `error`일 때 응답을 실패시킨 단계는 `resolve`, `retrieve`, `context`, `generate`, `citations` 중 `error`인 단계다. 이 단계들은 첫 실패에서 멈추므로 많아야 하나다. 그중 실패가 없으면 `record` 단계다. `rewrite`와 `place_lookup` 실패는 응답 상태를 바꾸지 않으므로 응답 실패 원인으로 세지 않는다.
 - `error_code` 필드가 없는 이전 실행 기록 JSON도 그대로 읽힌다. 분류(`category`)는 아직 기록하지 않는다.
 
@@ -125,14 +125,25 @@ info.detail        # 실행 기록에 남긴다. 예: "ValueError: boom"
 | `pipeline.missing_citation` | `citations` | `answered`인데 인용이 없다. |
 | `pipeline.citation_outside_evidence` | `citations` | 모델 입력에 없던 청크를 인용했다. |
 | `pipeline.invalid_callback_result` | 해당 콜백 단계 | 콜백 결과가 공용 규격 검증을 통과하지 못했다. |
+| `pipeline.place_lookup_failed` | `place_lookup` | 장소 조회 콜백이 `status="error"`를 반환했다. 응답과 `places`는 그대로다. |
+
+`pipeline.place_lookup_failed`는 예외 없이 단계 기록에 직접 붙이는 코드다. 이 단계의 `error`에는 `"타입: 메시지"` 대신 콜백이 반환한 `PlaceLookupResult.error`가 들어가며, 비어 있으면 "장소 조회 콜백이 실패 상태를 반환했습니다."를 쓴다.
+
+`pipeline.missing_citation`과 `pipeline.citation_outside_evidence`는 생성기가 청크 ID를 직접 돌려줄 때 걸린다. `make_answer_generator`를 쓰는 P04 생성기는 인용 번호를 먼저 검사하므로, 같은 문제가 `generate` 단계의 `generation.missing_citation`·`generation.invalid_citation`으로 기록된다.
 
 ### 답변 생성 코드
 
-`src/generation/pipeline_adapter.py`의 `AnswerGenerationError`는 `(ApplicationError, RuntimeError)`이며 메시지는 기존처럼 실패 이유(`invalid_draft` 등)다. 실패 이유는 어댑터가 직접 붙이는 값(`condition_decode_failed`, `pending_evidence`, `invalid_citation`)과 `answer.py`에서 넘어오는 `error_kind`(현재 `invalid_input`, `generation_failed`, `invalid_draft`)다. 코드는 다음과 같이 정해진다.
+`src/generation/pipeline_adapter.py`의 `AnswerGenerationError`는 `(ApplicationError, RuntimeError)`이며 메시지는 기존처럼 실패 이유(`invalid_draft` 등)다. 실패 이유는 어댑터가 직접 붙이는 값(`condition_decode_failed`, `pending_evidence`, `invalid_citation`)과 `answer.py`에서 넘어오는 `error_kind`(현재 `invalid_input`, `generation_failed`, `invalid_draft`, `missing_citation`, `invalid_citation`)다. `answer.py`는 이유를 다음 순서로 정한다.
+
+- 일반 답변: 상태가 `answered`가 아니거나 본문이 비었거나 링크가 있으면 `invalid_draft`다. 본문이 올바를 때 `citation_indices`가 없거나 목록이 아니거나 비어 있으면 `missing_citation`, 목록 안에 근거 범위 밖 번호나 정수가 아닌 값(문자열, `True`, `None` 등)이 하나라도 있으면 `invalid_citation`이다.
+- 출처 충돌 응답: 근거 측면을 차례로 검사한다. 측면이 객체가 아니거나 발췌문이 문자열이 아니면 `invalid_draft`, 근거 번호가 잘못되면 `invalid_citation`이다. 발췌문이 원문에 없거나 링크가 있음, 같은 출처의 반복, 측면이 둘 미만, 발췌문이 모두 같음은 `invalid_draft`다. 앞 측면의 번호 오류가 먼저 발견되면 뒤 측면의 형식 오류는 확인하지 않는다.
+- 어댑터는 인용된 청크 ID가 비었거나 전달한 청크에 없으면 `invalid_citation`으로 둔다.
+
+코드는 다음과 같이 정해진다.
 
 | 코드 | 뜻 | 기록을 본 뒤 할 일 |
 | --- | --- | --- |
-| `generation.<이유>` | 원인이 분류된 생성 실패. 예: `generation.generation_failed`는 답변 초안 함수(모델 호출)의 실패 | 이유에 맞게 원인을 확인한다. |
+| `generation.<이유>` | 원인이 분류된 생성 실패. 예: `generation.generation_failed`는 답변 초안 함수(모델 호출)의 실패, `generation.invalid_citation`은 잘못된 인용 번호나 청크 | 이유에 맞게 원인을 확인한다. |
 | `generation.invalid_error_kind` | 실패 이유 값이 한 구간의 snake_case가 아니어서 코드로 쓸 수 없음. 에러 처리 중에 새 오류가 나지 않도록 하는 방어 장치 | `answer.py`의 `error_kind` 값이 바뀌었는지 확인한다. |
 | `generation.failed` | 코드 없이 `AnswerGenerationError`를 던진 미분류 오류(클래스 기본값) | 그 `raise`에 이유와 코드를 붙인다. |
 
