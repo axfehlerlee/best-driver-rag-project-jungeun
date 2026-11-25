@@ -91,9 +91,52 @@ info.detail        # 실행 기록에 남긴다. 예: "ValueError: boom"
 
 `ApplicationError`가 아닌 예외는 `common.unexpected_error` 코드와 `internal` 분류, 공통 오류 안내로 설명한다. 원래 예외 메시지에는 파일 경로나 본문 조각이 들어갈 수 있으므로 화면에는 `user_message`만 표시한다. `user_message`는 클래스에 고정 문구로만 정하고, 인스턴스에서 실행 값(경로, 질문, 모델 응답)을 넣어 바꾸지 않는다. `detail`은 바깥 예외만 설명하며 `raise ... from`으로 연결된 원인 예외는 포함하지 않는다. API 키, 토큰과 원문 전체는 예외 메시지에도 넣지 않는다.
 
-## 현재 연결 범위
+## 파이프라인 연결
 
-공통 기반을 질문 정제 예외에 적용했으며, 공용 실행 흐름의 구조화된 오류 기록에는 아직 연결하지 않았다. `src/pipeline.py`는 지금도 예외를 `"타입: 메시지"` 문자열로 `PipelineResponse.error`, `StageRecord.error`와 `PlaceLookupResult.error`에 기록하고, `src/contracts.py`에는 에러 코드 필드가 없다. 응답과 실행 기록에 `code`를 남기는 변경은 공용 규격을 사용하는 담당자와 합의한 뒤 별도로 진행한다.
+`src/pipeline.py`는 예외를 기록하는 모든 자리에서 `describe_error`를 거친다. 실행 기록에서 에러를 읽는 위치는 다음과 같다.
+
+| 필드 | 채우는 경우 | 내용 |
+| --- | --- | --- |
+| `PipelineResponse.answer` | 항상 | `status="error"`이면 그 예외 클래스의 `user_message`. 화면에는 이 값을 표시한다. 단, 답변을 만든 뒤 실행 기록 저장만 실패한 경우에는 생성된 답변이 그대로 남는다. |
+| `PipelineResponse.error` | `status="error"` | 기록용 내부 상세 `"타입: 메시지"`. 화면에 표시하지 않는다. |
+| `PipelineResponse.error_code` | `status="error"` | 응답을 실패시킨 원인 코드 |
+| `StageRecord.error`, `StageRecord.error_code` | 해당 단계가 실패 | 그 단계의 내부 상세와 원인 코드 |
+| `PlaceLookupResult.error` | 장소 조회 실패 | 내부 상세. 코드는 `place_lookup` 단계 기록에 있다. |
+
+- 질문 다듬기와 장소 조회가 실패해도 문서 답변은 계속 진행한다. 이때 응답의 `error_code`는 `None`이고 코드는 `rewrite` 또는 `place_lookup` 단계 기록에만 남는다.
+- 실행 기록 저장이 실패하면 응답이 `error`로 바뀐다. 이미 앞 단계에서 실패했다면 응답의 `error_code`는 최초 원인을 유지한다.
+- 평가는 실패한 단계 이름과 `error_code`를 묶어 실패를 분류한다. 예: `citations` 단계의 `pipeline.citation_outside_evidence`는 잘못된 인용이다.
+- 여러 단계가 `error`일 때 응답을 실패시킨 단계는 `resolve`, `retrieve`, `context`, `generate`, `citations` 중 `error`인 단계다. 이 단계들은 첫 실패에서 멈추므로 많아야 하나다. 그중 실패가 없으면 `record` 단계다. `rewrite`와 `place_lookup` 실패는 응답 상태를 바꾸지 않으므로 응답 실패 원인으로 세지 않는다.
+- `error_code` 필드가 없는 이전 실행 기록 JSON도 그대로 읽힌다. 분류(`category`)는 아직 기록하지 않는다.
+
+### 파이프라인 검사 코드
+
+파이프라인은 콜백 결과가 규격을 어기면 `PipelineContractError`(`contract_violation`)를, 리라이트를 켰는데 rewriter가 없으면 `PipelineConfigurationError`(`configuration`)를 낸다. 둘 다 `ValueError`를 함께 상속한다. `pipeline.invalid_callback_result`는 콜백이 **반환한 값**의 검증 실패에만 붙는다. 콜백 안에서 직접 발생한 pydantic 검증 오류는 `common.unexpected_error`로 기록된다.
+
+| 코드 | 단계 | 원인 |
+| --- | --- | --- |
+| `pipeline.empty_search_query` | `resolve` | 해석된 검색 질의가 비어 있다. |
+| `pipeline.missing_clarification_question` | `resolve` | 되묻기 상태인데 추가 질문이 없다. |
+| `pipeline.region_mismatch` | `resolve` | 해석된 구가 요청에서 지정한 구와 다르다. |
+| `pipeline.rewriter_not_configured` | `rewrite` | 리라이트를 켰지만 rewriter가 연결되지 않았다. |
+| `pipeline.invalid_rewrite_output` | `rewrite` | 리라이트 결과가 비었거나 문자열이 아니다. |
+| `pipeline.invalid_retrieval_result` | `retrieve` | 검색 결과가 목록이 아니다. |
+| `pipeline.duplicate_chunk_id` | `context` | 검색 후보의 `chunk_id`가 중복된다. |
+| `pipeline.missing_citation` | `citations` | `answered`인데 인용이 없다. |
+| `pipeline.citation_outside_evidence` | `citations` | 모델 입력에 없던 청크를 인용했다. |
+| `pipeline.invalid_callback_result` | 해당 콜백 단계 | 콜백 결과가 공용 규격 검증을 통과하지 못했다. |
+
+### 답변 생성 코드
+
+`src/generation/pipeline_adapter.py`의 `AnswerGenerationError`는 `(ApplicationError, RuntimeError)`이며 메시지는 기존처럼 실패 이유(`invalid_draft` 등)다. 실패 이유는 어댑터가 직접 붙이는 값(`condition_decode_failed`, `pending_evidence`, `invalid_citation`)과 `answer.py`에서 넘어오는 `error_kind`(현재 `invalid_input`, `generation_failed`, `invalid_draft`)다. 코드는 다음과 같이 정해진다.
+
+| 코드 | 뜻 | 기록을 본 뒤 할 일 |
+| --- | --- | --- |
+| `generation.<이유>` | 원인이 분류된 생성 실패. 예: `generation.generation_failed`는 답변 초안 함수(모델 호출)의 실패 | 이유에 맞게 원인을 확인한다. |
+| `generation.invalid_error_kind` | 실패 이유 값이 한 구간의 snake_case가 아니어서 코드로 쓸 수 없음. 에러 처리 중에 새 오류가 나지 않도록 하는 방어 장치 | `answer.py`의 `error_kind` 값이 바뀌었는지 확인한다. |
+| `generation.failed` | 코드 없이 `AnswerGenerationError`를 던진 미분류 오류(클래스 기본값) | 그 `raise`에 이유와 코드를 붙인다. |
+
+세 경우 모두 화면 문구는 "답변을 준비하는 중 오류가 발생했습니다."다.
 
 
 ## 질문 정제 적용
@@ -109,4 +152,4 @@ info.detail        # 실행 기록에 남긴다. 예: "ValueError: boom"
 
 `rewrite.py`의 모델 호출과 출력 검사에 적용했다. 실행 중 정제 실패는 기존 파이프라인이 잡아 지역 해석이 끝난 `resolved.search_query`로 검색을 계속한다. `prompt_runtime.py`에서 호출 함수가 누락된 경우는 런타임 생성 시 실패하며 검색 복귀와는 별개다.
 
-`rewrite_question()`의 반환 필드와 `pipeline.py`는 변경하지 않았다. 현재 실행 기록에는 예외 이름과 상세 문자열만 남으며 `code`와 `category`의 구조화 기록은 후속 연결이 필요하다. 모델 요청·응답 본문은 상세 메시지에 넣지 않는다.
+`rewrite_question()`의 반환 필드는 변경하지 않았다. 실행 중 정제 실패의 코드는 [파이프라인 연결](#파이프라인-연결)에 따라 `rewrite` 단계 기록의 `error_code`에 남으며, `category`는 아직 기록하지 않는다. 모델 요청·응답 본문은 상세 메시지에 넣지 않는다.
