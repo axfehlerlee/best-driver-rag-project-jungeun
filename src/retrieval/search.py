@@ -19,9 +19,18 @@ from src.infrastructure.stores import IndexSnapshot
 Retriever = Callable[..., list[SearchCandidate]]
 
 
+# top_k가 0 이하 혹은
+# 질문 벡터 차원이 다를 때
+# 즉 입력에서 잘못될 때 잡는 오류
 class RetrievalError(ApplicationError, ValueError):
     code = "retrieval.invalid_query"
     category = ErrorCategory.INVALID_INPUT
+
+
+# 임베딩과 색인이 다른 경우 (설정에 문제 있을 때) 잡는 오류
+class RetrievalConfigError(RetrievalError):
+    code = "retrieval.embedding_mismatch"
+    category = ErrorCategory.CONFIGURATION
 
 
 def is_in_region(chunk: Chunk, district: str | None) -> bool:
@@ -102,7 +111,7 @@ def make_vector_retriever(
     색인을 만든 임베딩과 다른 임베딩으로 질문을 바꾸면 벡터를 비교할 수 없어 처음에 막는다.
     """
     if embedder.identity != index.metadata.embedding_identity:
-        raise RetrievalError("질문 임베딩이 색인을 만든 임베딩과 다릅니다.")
+        raise RetrievalConfigError("질문 임베딩이 색인을 만든 임베딩과 다릅니다.")
 
     def retrieve(
         query: ResolvedQuery, *, variant: str, top_k: int

@@ -5,6 +5,7 @@ import pytest
 from src.contracts import Chunk, ResolvedQuery
 from src.ingestion.indexing import build_index
 from src.retrieval.search import (
+    RetrievalConfigError,
     cosine_similarity,
     is_in_region,
     make_vector_retriever,
@@ -144,3 +145,12 @@ def test_retriever_raises_for_unimplemented_variant():
 
     with pytest.raises(NotImplementedError):
         retrieve(query, variant="B", top_k=5)
+
+
+def test_retriever_rejects_embedder_different_from_index():
+    # 색인을 만든 임베딩과 다른 임베딩이면 벡터를 비교할 수 없다 → 설정 오류.
+    class OtherEmbedder(FakeEmbedder):
+        identity = "another-embedding-v1"
+
+    with pytest.raises(RetrievalConfigError):
+        make_vector_retriever(make_index(), OtherEmbedder())
