@@ -105,3 +105,31 @@ def test_parse_places_keeps_detail_address():
 
     assert places[0].address == "서울특별시 서대문구 연희동 1-1 연희동 주민센터"
     assert places[1].address == "서울시 서대문구 연희로 10"
+
+
+def test_parse_places_keeps_same_place_id_regardless_of_order():
+    # 장소 순서가 바뀌어도 같은 장소는 같은 place_id (PR 리뷰 반영).
+    raw = load_sample()
+    reversed_raw = load_sample()
+    reversed_raw["response"]["body"]["items"]["item"].reverse()
+
+    ids = {p.name: p.place_id for p in parse_places(raw, "서대문구")}
+    reversed_ids = {p.name: p.place_id for p in parse_places(reversed_raw, "서대문구")}
+
+    assert ids == reversed_ids
+
+
+def test_parse_places_drops_exact_duplicates():
+    # 이름·주소·상세가 완전히 같은 항목은 한 번만 남긴다 (실제 응답에서 확인한 중복).
+    spot = {
+        "spotNm": "종량제봉투 판매소",
+        "addrBase": "서울특별시 송파구 석촌호수로 61",
+    }
+    other = {"spotNm": "의류수거함", "addrBase": "서울특별시 송파구 석촌호수로 61"}
+    raw = {"response": {"body": {"items": {"item": [spot, dict(spot), other]}}}}
+
+    places = parse_places(raw, "송파구")
+
+    # 같은 주소라도 이름이 다르면 다른 장소로 남는다.
+    assert [p.name for p in places] == ["종량제봉투 판매소", "의류수거함"]
+    assert len({p.place_id for p in places}) == 2

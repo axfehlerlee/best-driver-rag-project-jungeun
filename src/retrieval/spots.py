@@ -21,7 +21,7 @@ GETSPOT_SOURCE_URL = "https://www.data.go.kr/data/15156866/openapi.do"
 
 # 장소명에서 찾을 품목 키워드. 같은 품목이 여러 표기로 와서(폐형광등·폐건전지 / 폐형광등 폐건전지)
 # 장소명 전체가 아니라 키워드 포함 여부로 판단한다.
-# 2026-11-25 실제 응답(연희동·잠실동)의 장소명 전체를 확인해 정했다.
+# 2026-11-25 실제 응답 샘플(연희동·잠실동)의 장소명 전체를 확인해 정했다.
 COLLECTION_KEYWORDS: tuple[str, ...] = (
     "폐건전지",
     "폐형광등",
@@ -59,7 +59,7 @@ def infer_collection_types(spot_name: str) -> list[str]:
     """장소명에서 받는 품목을 추론한다.
 
     예: "폐형광등·폐건전지 수거함" → ["폐건전지", "폐형광등"]
-    품목 키워드가 없거나 수거 장소가 아니면 빈 목록
+    품목 키워드가 없거나 수거 장소가 아니면(ex. 판매소, RFID) 빈 목록
     (모르는 품목을 받는다고 단정하지 않는다).
     """
     if any(marker in spot_name for marker in NON_COLLECTION_MARKERS):
@@ -78,30 +78,51 @@ def parse_places(raw: dict, district: str) -> list[PlaceResult]:
 
     좌표는 응답에 없으므로 None으로 둔다 (추측해서 채우지 않는다).
     좌표가 없어 상세 위치(addrDtl)가 찾아가는 단서이므로, 있으면 주소 뒤에 붙인다.
+    이름·주소·상세가 모두 같은 항목은 한 번만 남긴다.
     """
     places: list[PlaceResult] = []
+    seen_ids: set[str] = set()
 
     for item in extract_items(raw):
+        # 1. 빈 값(null) 정리
         # 공공 API는 빈 값을 null로 줄 수 있다. .get(키, "")는 키가 없을 때만 ""를 쓰고
         # 값이 None이면 None을 돌려주므로, `or ""`로 None도 빈 문자열로 맞춘다.
         base_address = item.get("addrBase") or ""
 
-        # 다른 시(인천 연희동 등)를 거르기. 상세 위치에 다른 구 이름이 섞여도
-        # 헷갈리지 않도록 구 판단은 기본 주소(addrBase)로만 한다.
+        # 2. 다른 시(인천 연희동 등)를 거르기.
+        # 상세 위치에 다른 구 이름이 섞여도 헷갈리지 않도록
+        # 구 판단은 기본 주소(addrBase)로만 한다.
+        # 주소에 "서대문구"가 없으면 버림
         if district not in base_address:
             continue
 
+        # 3. 주소 만들기
         detail = (item.get("addrDtl") or "").strip()
+        # 기본 주소 + 상세 위치 (주민센터)
         address = f"{base_address} {detail}" if detail else base_address
         spot_name = item.get("spotNm") or ""
 
+        # 4. 번호(ID) 만들기
+        # getspot: 이름|주소|상세
+        # 순번은 검색·필터 조건마다 바뀌므로 장소 정보로 ID를 만든다 (같은 장소 = 같은 ID).
+        place_id = f"getspot:{spot_name}|{base_address}|{detail}"
+
+        # 5. 중복 거르기
+        # 실제 응답에 이름·주소·상세가 완전히 같은 항목이 여러 번 온다
+        # (2026-11-25 샘플 확인: 연희동 15곳, 잠실동 52곳이 2~4번씩 반복).
+        # 서로 다른 장소인지 구분할 정보가 없어 한 번만 남긴다.
+        if place_id in seen_ids:
+            continue
+        seen_ids.add(place_id)
+
+        # PlaceResult로 만들어서 목록에 추가
         places.append(
             PlaceResult(
                 name=spot_name,
                 address=address,
                 source_url=GETSPOT_SOURCE_URL,
                 collection_types=infer_collection_types(spot_name),
-                place_id=f"getspot-{len(places) + 1}",  # 임시 ID, DB 단계에서 바꿀 예정
+                place_id=place_id,
             )
         )
     return places
