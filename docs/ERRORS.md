@@ -59,7 +59,7 @@ raise AnswerDraftError("조건 해석 실패", code="generation.condition_decode
 
 ## 기존 예외를 옮기는 방법
 
-기존 예외는 담당자가 원하는 시점에 직접 옮긴다. 메시지 하나만 받는 `ValueError`·`RuntimeError` 계열 예외는 `ApplicationError`를 **앞에** 두고 기존 상위 클래스를 함께 상속하면 기존 `raise`와 `except` 코드를 바꾸지 않아도 된다. 현재 7개 예외가 모두 여기에 해당한다.
+기존 예외는 담당자가 원하는 시점에 직접 옮긴다. 메시지 하나만 받는 `ValueError`·`RuntimeError` 계열 예외는 `ApplicationError`를 **앞에** 두고 기존 상위 클래스를 함께 상속하면 기존 `raise`와 `except` 코드를 바꾸지 않아도 된다. 아래의 기존 예외 7개가 여기에 해당한다.
 
 순서를 바꿔 `class X(ValueError, ApplicationError)`로 쓰면 `ValueError.__init__`이 먼저 실행돼 `code=` 인자를 받지 못하므로, 공통 기반이 클래스 정의 시점에 `TypeError`로 막는다. 이 오류는 해당 모듈을 import할 때 발생하므로 변경한 브랜치의 테스트에서 바로 드러난다.
 
@@ -75,7 +75,7 @@ class SourceManifestError(ApplicationError, ValueError):
     category = ErrorCategory.INVALID_INPUT
 ```
 
-현재 별도 예외 클래스는 `SourceManifestError`, `SourceDocumentLoadError`, `XMLAdapterError`, `PreprocessedBundleError`, `PreprocessedChunkingError`, `EvaluationCaseError`, `AnswerGenerationError`가 있다.
+공통 기반 도입 전의 별도 예외 클래스는 `SourceManifestError`, `SourceDocumentLoadError`, `XMLAdapterError`, `PreprocessedBundleError`, `PreprocessedChunkingError`, `EvaluationCaseError`, `AnswerGenerationError`가 있다.
 
 ## 사용자 메시지와 내부 상세
 
@@ -93,4 +93,20 @@ info.detail        # 실행 기록에 남긴다. 예: "ValueError: boom"
 
 ## 현재 연결 범위
 
-공통 기반만 추가했으며 공용 실행 흐름에는 아직 연결하지 않았다. `src/pipeline.py`는 지금도 예외를 `"타입: 메시지"` 문자열로 `PipelineResponse.error`, `StageRecord.error`와 `PlaceLookupResult.error`에 기록하고, `src/contracts.py`에는 에러 코드 필드가 없다. 응답과 실행 기록에 `code`를 남기는 변경은 공용 규격을 사용하는 담당자와 합의한 뒤 별도로 진행한다.
+공통 기반을 질문 정제 예외에 적용했으며, 공용 실행 흐름의 구조화된 오류 기록에는 아직 연결하지 않았다. `src/pipeline.py`는 지금도 예외를 `"타입: 메시지"` 문자열로 `PipelineResponse.error`, `StageRecord.error`와 `PlaceLookupResult.error`에 기록하고, `src/contracts.py`에는 에러 코드 필드가 없다. 응답과 실행 기록에 `code`를 남기는 변경은 공용 규격을 사용하는 담당자와 합의한 뒤 별도로 진행한다.
+
+
+## 질문 정제 적용
+
+`src/query/errors.py`는 공통 기반을 상속하며 기존 예외 타입과 상세 메시지를 유지한다.
+
+| 클래스 | 기존 타입 | 분류 | 코드 |
+| --- | --- | --- | --- |
+| `RewriteCallError` | `RuntimeError` | `external_service` | `query.rewrite_call_failed` |
+| `RewriteOutputTypeError` | `TypeError` | `contract_violation` | `query.rewrite_invalid_type` |
+| `RewriteOutputError` | `ValueError` | `contract_violation` | 기본 `query.rewrite_invalid_format`, 별칭 규칙 위반은 `code="query.rewrite_rule_violation"` |
+| `RewriteConfigurationError` | `ValueError` | `configuration` | `query.rewrite_not_configured` |
+
+`rewrite.py`의 모델 호출과 출력 검사에 적용했다. 실행 중 정제 실패는 기존 파이프라인이 잡아 지역 해석이 끝난 `resolved.search_query`로 검색을 계속한다. `prompt_runtime.py`에서 호출 함수가 누락된 경우는 런타임 생성 시 실패하며 검색 복귀와는 별개다.
+
+`rewrite_question()`의 반환 필드와 `pipeline.py`는 변경하지 않았다. 현재 실행 기록에는 예외 이름과 상세 문자열만 남으며 `code`와 `category`의 구조화 기록은 후속 연결이 필요하다. 모델 요청·응답 본문은 상세 메시지에 넣지 않는다.
